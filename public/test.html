@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Shopping Assistant Test Page</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    .test-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .test-panel {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+
+    .test-panel h2 {
+      margin-top: 0;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .test-button {
+      background-color: #5c6ac4;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+
+    .test-button:hover {
+      background-color: #202e78;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .mockProducts {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .mockProduct {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .mockProduct img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+    }
+
+    .mockProduct-details {
+      padding: 15px;
+    }
+
+    .mockProduct-title {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .mockProduct-price {
+      color: #202e78;
+      font-weight: 600;
+    }
+
+    .mockProduct-description {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <div class="test-panel">
+      <h2>AI Shopping Assistant Test Page</h2>
+      <p>This page allows you to test the AI shopping assistant widget outside of a Shopify store environment.</p>
+
+      <div class="input-group">
+        <label for="api-key">Shopify Storefront API Token (Optional):</label>
+        <input type="text" id="api-key" placeholder="Enter your Storefront API token">
+      </div>
+
+      <div class="input-group">
+        <label for="shop-url">Shopify Store URL (Optional):</label>
+        <input type="text" id="shop-url" placeholder="your-store.myshopify.com">
+      </div>
+
+      <div class="input-group">
+        <label for="claude-key">Claude API Key (Optional):</label>
+        <input type="text" id="claude-key" placeholder="Enter your Claude API key">
+      </div>
+
+      <button id="save-settings" class="test-button">Save Settings</button>
+      <button id="reset-settings" class="test-button">Reset Settings</button>
+    </div>
+
+    <div class="test-panel">
+      <h2>Mock Products</h2>
+      <p>These are sample products used for testing when not connected to a real Shopify store.</p>
+
+      <div class="mockProducts">
+        <div class="mockProduct">
+          <img src="https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-product-1_large.png" alt="Placeholder product">
+          <div class="mockProduct-details">
+            <div class="mockProduct-title">Comfortable Backpack</div>
+            <div class="mockProduct-price">£65.00</div>
+            <div class="mockProduct-description">A versatile backpack perfect for everyday use, hiking, or travel.</div>
+          </div>
+        </div>
+
+        <div class="mockProduct">
+          <img src="https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-product-2_large.png" alt="Placeholder product">
+          <div class="mockProduct-details">
+            <div class="mockProduct-title">Stylish Watch</div>
+            <div class="mockProduct-price">£125.00</div>
+            <div class="mockProduct-description">A premium watch with a sleek design, suitable for both casual and formal occasions.</div>
+          </div>
+        </div>
+
+        <div class="mockProduct">
+          <img src="https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-product-3_large.png" alt="Placeholder product">
+          <div class="mockProduct-details">
+            <div class="mockProduct-title">Wireless Headphones</div>
+            <div class="mockProduct-price">£89.99</div>
+            <div class="mockProduct-description">High-quality wireless headphones with active noise cancellation and long battery life.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load settings from localStorage
+    document.addEventListener('DOMContentLoaded', () => {
+      const apiKeyInput = document.getElementById('api-key');
+      const shopUrlInput = document.getElementById('shop-url');
+      const claudeKeyInput = document.getElementById('claude-key');
+
+      // Load saved settings if available
+      const savedSettings = JSON.parse(localStorage.getItem('aiShopAssistant_settings') || '{}');
+
+      if (savedSettings.apiKey) {
+        apiKeyInput.value = savedSettings.apiKey;
+      }
+
+      if (savedSettings.shopUrl) {
+        shopUrlInput.value = savedSettings.shopUrl;
+      }
+
+      if (savedSettings.claudeKey) {
+        claudeKeyInput.value = savedSettings.claudeKey;
+      }
+
+      // Setup event listeners
+      document.getElementById('save-settings').addEventListener('click', () => {
+        const settings = {
+          apiKey: apiKeyInput.value.trim(),
+          shopUrl: shopUrlInput.value.trim(),
+          claudeKey: claudeKeyInput.value.trim()
+        };
+
+        localStorage.setItem('aiShopAssistant_settings', JSON.stringify(settings));
+
+        // Set environment variables for the app
+        window.SHOPIFY_STOREFRONT_ACCESS_TOKEN = settings.apiKey;
+        window.SHOPIFY_STORE_URL = settings.shopUrl;
+        window.CLAUDE_API_KEY = settings.claudeKey;
+
+        alert('Settings saved! Refresh the page to apply changes.');
+      });
+
+      document.getElementById('reset-settings').addEventListener('click', () => {
+        localStorage.removeItem('aiShopAssistant_settings');
+        apiKeyInput.value = '';
+        shopUrlInput.value = '';
+        claudeKeyInput.value = '';
+        alert('Settings reset!');
+      });
+    });
+  </script>
+
+  <script src="bundle.js"></script>
+</body>
+</html>
