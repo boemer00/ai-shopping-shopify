@@ -1,4 +1,5 @@
 import { formatDate } from '../utils/helpers';
+import { createConversation, addMessage, getMessages } from '../services/supabaseService';
 
 /**
  * Initialize the chat widget
@@ -38,7 +39,48 @@ class ChatWidget {
     this.isLoading = false;
     this.conversationHistory = [];
     this.initialized = false;
+    this.conversationId = null;
+    this.shopId = this.getShopId();
+    this.customerId = this.getCustomerId();
     console.log('ChatWidget constructed');
+  }
+
+  /**
+   * Get shop ID from the URL or window object
+   * @returns {string} The shop ID
+   */
+  getShopId() {
+    // Try to get from query string first
+    const url = new URL(window.location.href);
+    const shopOrigin = url.searchParams.get('shop');
+
+    if (shopOrigin) {
+      return shopOrigin;
+    }
+
+    // Try to get from window variable
+    if (window.SHOPIFY_STORE_URL) {
+      return window.SHOPIFY_STORE_URL;
+    }
+
+    // Fallback to ancestor origins if in iframe
+    if (window.location.ancestorOrigins && window.location.ancestorOrigins[0]) {
+      const ancestorUrl = new URL(window.location.ancestorOrigins[0]);
+      return ancestorUrl.hostname;
+    }
+
+    // Default for development
+    return process.env.SHOPIFY_STORE_URL || 'test-store-tailor-ai.myshopify.com';
+  }
+
+  /**
+   * Get customer ID if available
+   * @returns {string|null} The customer ID or null
+   */
+  getCustomerId() {
+    // For now, we'll just use a placeholder
+    // In a real implementation, this would come from the Shopify customer data
+    return null;
   }
 
   /**
@@ -113,20 +155,100 @@ class ChatWidget {
         return;
       }
 
+      // Create a new conversation in Supabase
+      await this.createNewConversation();
+
       // Set up event listeners
       this.setupEventListeners();
 
-      // Add welcome message
-      if (this.messagesContainer) {
+      // Load previous messages if available
+      await this.loadMessages();
+
+      // Add welcome message if no previous messages
+      if (this.conversationHistory.length === 0 && this.messagesContainer) {
         this.addWelcomeMessageDirect();
-      } else {
-        console.error('Cannot add welcome message - messagesContainer not found');
       }
 
       this.initialized = true;
       console.log('ChatWidget initialization completed');
     } catch (error) {
       console.error('Error in ChatWidget.init():', error);
+    }
+  }
+
+  /**
+   * Create a new conversation in Supabase
+   */
+  async createNewConversation() {
+    try {
+      if (!this.shopId) {
+        console.warn('Shop ID not available, using default');
+        this.shopId = 'default-shop';
+      }
+
+      console.log('Creating new conversation with shop ID:', this.shopId);
+      const { conversation, error } = await createConversation(this.shopId, this.customerId);
+
+      if (error) {
+        console.error('Error creating conversation:', error);
+        return;
+      }
+
+      if (conversation) {
+        this.conversationId = conversation.id;
+        console.log('New conversation created with ID:', this.conversationId);
+      }
+    } catch (error) {
+      console.error('Error in createNewConversation:', error);
+    }
+  }
+
+  /**
+   * Load previous messages from Supabase
+   */
+  async loadMessages() {
+    try {
+      if (!this.conversationId) {
+        console.warn('No conversation ID available, skipping message loading');
+        return;
+      }
+
+      console.log('Loading messages for conversation:', this.conversationId);
+      const { messages, error } = await getMessages(this.conversationId);
+
+      if (error) {
+        console.error('Error loading messages:', error);
+        return;
+      }
+
+      if (messages && messages.length > 0) {
+        console.log(`Loaded ${messages.length} messages from Supabase`);
+
+        // Clear existing messages in UI
+        this.messagesContainer.innerHTML = '';
+
+        // Add messages to UI and conversation history
+        this.conversationHistory = [];
+
+        messages.forEach(message => {
+          this.conversationHistory.push({
+            role: message.role,
+            content: message.content
+          });
+
+          if (message.role === 'user') {
+            this.addUserMessageDirect(message.content);
+          } else if (message.role === 'assistant') {
+            this.addAssistantMessageDirect(message.content);
+          }
+        });
+
+        console.log('Messages loaded and displayed');
+      } else {
+        console.log('No previous messages found');
+      }
+    } catch (error) {
+      console.error('Error in loadMessages:', error);
     }
   }
 
@@ -249,10 +371,39 @@ class ChatWidget {
       role: 'assistant',
       content: "Hello! I'm your shopping assistant. How can I help you today?"
     });
+
+    // Save welcome message to Supabase
+    this.saveMessageToSupabase('assistant', "Hello! I'm your shopping assistant. How can I help you today?");
   }
 
   /**
-   * Handle sending a user message
+   * Save message to Supabase
+   * @param {string} role - The message role (user or assistant)
+   * @param {string} content - The message content
+   */
+  async saveMessageToSupabase(role, content) {
+    try {
+      if (!this.conversationId) {
+        console.warn('No conversation ID available, cannot save message');
+        return;
+      }
+
+      console.log(`Saving ${role} message to Supabase:`, content.substring(0, 30) + '...');
+      const { message, error } = await addMessage(this.conversationId, role, content);
+
+      if (error) {
+        console.error('Error saving message to Supabase:', error);
+        return;
+      }
+
+      console.log('Message saved successfully with ID:', message?.id);
+    } catch (error) {
+      console.error('Error in saveMessageToSupabase:', error);
+    }
+  }
+
+  /**
+   * Handle sending a message
    */
   async handleSendMessage() {
     const message = this.inputField.value.trim();
@@ -274,6 +425,9 @@ class ChatWidget {
       role: 'user',
       content: message
     });
+
+    // Save user message to Supabase
+    await this.saveMessageToSupabase('user', message);
 
     // Show loading indicator
     this.setLoading(true);
@@ -335,6 +489,9 @@ class ChatWidget {
         content: assistantResponse
       });
 
+      // Save assistant message to Supabase
+      await this.saveMessageToSupabase('assistant', assistantResponse);
+
       // Directly add assistant message
       this.addAssistantMessageDirect(assistantResponse);
 
@@ -343,6 +500,9 @@ class ChatWidget {
 
       // Add error message directly
       this.addAssistantMessageDirect('Sorry, I encountered an error. Please try again later. Technical details: ' + error.message);
+
+      // Save error message to Supabase
+      await this.saveMessageToSupabase('assistant', 'Sorry, I encountered an error. Please try again later. Technical details: ' + error.message);
     } finally {
       this.setLoading(false);
     }
