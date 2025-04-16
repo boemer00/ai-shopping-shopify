@@ -7,8 +7,52 @@ const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
+// Get allowed origins for CORS
+const getAllowedOrigins = () => {
+  const origins = [
+    'http://localhost:8000',
+    'http://localhost:8082',
+    'https://ai-shopping-shopify.vercel.app'
+  ];
+
+  // Add custom domain if specified in env
+  if (process.env.APP_URL) {
+    origins.push(process.env.APP_URL);
+  }
+
+  // Add the Shopify store URL if it exists
+  if (process.env.SHOPIFY_STORE_URL) {
+    const storeUrl = process.env.SHOPIFY_STORE_URL.replace('.myshopify.com', '');
+    origins.push(`https://${storeUrl}.myshopify.com`);
+    origins.push(`https://${process.env.SHOPIFY_STORE_URL}`);
+  }
+
+  return origins;
+};
+
+// Configure CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = getAllowedOrigins();
+
+    // In development, log the origin for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Request origin:', origin);
+    }
+
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked for origin:', origin);
+      callback(null, false);
+    }
+  },
+  credentials: true
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -67,7 +111,7 @@ app.post('/api/claude', async (req, res) => {
 
 // Main route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'src', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Test page route
@@ -102,7 +146,13 @@ app.get('/api-test', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: require('./package.json').version,
+    deployment: 'vercel'
+  });
 });
 
 // Simple API test endpoint
@@ -119,8 +169,15 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Test page available at http://localhost:${PORT}/test`);
-});
+// For Vercel serverless functions, we don't need to explicitly listen
+// But we keep this for local development
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Test page available at http://localhost:${PORT}/test`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+// Export for Vercel serverless deployment
+module.exports = app;
