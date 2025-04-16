@@ -10,7 +10,8 @@
  * @returns {Promise<Object>} The Claude API response
  */
 export const sendMessageToClaude = async (message, conversationHistory = [], context = {}) => {
-  const apiKey = process.env.CLAUDE_API_KEY || '';
+  // Check for API key in window first (for browser environments), then try process.env (for Node environments)
+  const apiKey = window.CLAUDE_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.CLAUDE_API_KEY : '') || '';
 
   if (!apiKey) {
     console.error('Missing Claude API key');
@@ -27,23 +28,30 @@ export const sendMessageToClaude = async (message, conversationHistory = [], con
   ];
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    console.log("Sending request to Claude API with model:", "claude-3-7-sonnet-20250219");
+
+    // Use local proxy server to avoid CORS issues
+    const apiEndpoint = '/api/claude';
+
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
         'x-api-key': apiKey,
       },
       body: JSON.stringify({
-        model: 'claude-3-7-sonnet-20250219',
+        model: "claude-3-7-sonnet-20250219",
         max_tokens: 1024,
         messages,
         system: getSystemPrompt(),
       }),
     });
 
+    console.log("Claude API response status:", response.status);
+
     if (!response.ok) {
       const errorData = await response.json();
+      console.error("Claude API error details:", errorData);
       throw new Error(errorData.error?.message || 'Unknown error occurred');
     }
 
@@ -175,4 +183,57 @@ export const extractSearchTerms = (message) => {
     .replace(/^(looking for|search for|find|do you have|i want|i need|show me|where can i find|where are|got any)[\s,]*/i, '');
 
   return cleanMessage;
+};
+
+/**
+ * Simple test function for Claude API
+ * @returns {Promise<Object>} Test result
+ */
+export const testClaudeConnection = async () => {
+  const apiKey = window.CLAUDE_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.CLAUDE_API_KEY : '') || '';
+
+  if (!apiKey) {
+    console.error('Missing Claude API key for test');
+    return { error: 'Claude API key is missing' };
+  }
+
+  try {
+    console.log("Testing Claude API connection...");
+    console.log("API Key starts with:", apiKey.substring(0, 4) + '...');
+
+    // Use local proxy server to avoid CORS issues
+    const apiEndpoint = '/api/claude';
+
+    console.log("Using API endpoint:", apiEndpoint);
+
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'Hello, are you working?' }],
+      }),
+    });
+
+    console.log("Claude API test response status:", response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(e => ({ error: 'Failed to parse error response' }));
+      console.error("Claude API test error details:", errorData);
+      return { error: errorData.error?.message || `API returned status ${response.status}` };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      message: data.content[0].text
+    };
+  } catch (error) {
+    console.error('Error in Claude API test:', error);
+    return { error: error.message || 'Unknown error occurred' };
+  }
 };

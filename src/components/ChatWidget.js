@@ -1,19 +1,33 @@
 import { formatDate } from '../utils/helpers';
-import { createMessage } from './Message';
-import { createProductCard } from './ProductCard';
-import { sendMessageToClaude, isProductSearch, extractSearchTerms } from '../services/claudeService';
-import { searchProducts, createCart, addToCart, getCart } from '../services/storefrontService';
-import {
-  createConversation,
-  addMessage,
-  getMessages,
-  saveUserPreferences
-} from '../services/supabaseService';
+
+/**
+ * Initialize the chat widget
+ * @returns {Object} The chat widget instance
+ */
+export const initChatWidget = () => {
+  console.log('Initializing chat widget...');
+
+  // Check if DOM is ready
+  if (document.readyState === 'loading') {
+    console.log('Document still loading, deferring chat widget initialization');
+    return null;
+  }
+
+  const chatWidget = new ChatWidget();
+
+  // Initialize async with setTimeout to ensure DOM is fully ready
+  setTimeout(() => {
+    chatWidget.init();
+  }, 100);
+
+  console.log('Chat widget initialized');
+  return chatWidget;
+};
 
 /**
  * Chat Widget Component
  */
-export class ChatWidget {
+class ChatWidget {
   constructor() {
     this.container = null;
     this.messagesContainer = null;
@@ -22,47 +36,98 @@ export class ChatWidget {
     this.toggleButton = null;
     this.isMinimized = false;
     this.isLoading = false;
-    this.conversationId = null;
-    this.cartId = null;
-    this.shopId = null;
-    this.customerId = null;
     this.conversationHistory = [];
+    this.initialized = false;
+    console.log('ChatWidget constructed');
   }
 
   /**
    * Initialize the chat widget
    */
   async init() {
-    this.container = document.getElementById('ai-shopping-assistant');
+    try {
+      // If already initialized, don't do it again
+      if (this.initialized) {
+        console.log('ChatWidget already initialized, skipping');
+        return;
+      }
 
-    // If container doesn't exist, create it
-    if (!this.container) {
-      this.container = this.createChatContainer();
-      document.body.appendChild(this.container);
+      console.log('Starting ChatWidget.init()');
+
+      // Find chat container or create it if it doesn't exist
+      this.container = document.getElementById('ai-shopping-assistant');
+      console.log('Container found:', !!this.container);
+
+      // If container doesn't exist, create it
+      if (!this.container) {
+        console.log('Creating container as it does not exist');
+        this.container = this.createChatContainer();
+        document.body.appendChild(this.container);
+        console.log('Container created and appended to body');
+      }
+
+      // Get references to elements within the container
+      this.messagesContainer = document.getElementById('chat-messages');
+      this.inputField = document.getElementById('chat-input');
+      this.sendButton = document.getElementById('send-message');
+      this.toggleButton = document.getElementById('toggle-chat');
+
+      console.log('Elements found:',
+        'messagesContainer:', !!this.messagesContainer,
+        'inputField:', !!this.inputField,
+        'sendButton:', !!this.sendButton,
+        'toggleButton:', !!this.toggleButton
+      );
+
+      // If elements still not found, try to find them within the container directly
+      if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
+        console.log('Some elements not found by ID, trying to find within container');
+
+        if (!this.messagesContainer) {
+          this.messagesContainer = this.container.querySelector('.chat-messages');
+        }
+
+        if (!this.inputField) {
+          this.inputField = this.container.querySelector('input[type="text"]');
+        }
+
+        if (!this.sendButton) {
+          this.sendButton = this.container.querySelector('button:not(.toggle-button)');
+        }
+
+        if (!this.toggleButton) {
+          this.toggleButton = this.container.querySelector('.toggle-button');
+        }
+
+        console.log('Elements after container search:',
+          'messagesContainer:', !!this.messagesContainer,
+          'inputField:', !!this.inputField,
+          'sendButton:', !!this.sendButton,
+          'toggleButton:', !!this.toggleButton
+        );
+      }
+
+      // If we still couldn't find all elements, log an error and return
+      if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
+        console.error('ChatWidget initialization failed - critical elements not found');
+        return;
+      }
+
+      // Set up event listeners
+      this.setupEventListeners();
+
+      // Add welcome message
+      if (this.messagesContainer) {
+        this.addWelcomeMessageDirect();
+      } else {
+        console.error('Cannot add welcome message - messagesContainer not found');
+      }
+
+      this.initialized = true;
+      console.log('ChatWidget initialization completed');
+    } catch (error) {
+      console.error('Error in ChatWidget.init():', error);
     }
-
-    this.messagesContainer = document.getElementById('chat-messages');
-    this.inputField = document.getElementById('chat-input');
-    this.sendButton = document.getElementById('send-message');
-    this.toggleButton = document.getElementById('toggle-chat');
-
-    // Set up event listeners
-    this.setupEventListeners();
-
-    // Get or create shop ID
-    this.shopId = window.Shopify?.shop || window.location.hostname;
-
-    // Try to get customer ID if available
-    this.customerId = this.getCustomerId();
-
-    // Create a conversation in Supabase
-    await this.createNewConversation();
-
-    // Create a cart
-    await this.createNewCart();
-
-    // Add welcome message
-    this.addWelcomeMessage();
   }
 
   /**
@@ -95,89 +160,95 @@ export class ChatWidget {
    * Set up event listeners
    */
   setupEventListeners() {
-    // Send message when button is clicked
-    this.sendButton.addEventListener('click', () => {
-      this.handleSendMessage();
-    });
-
-    // Send message when Enter key is pressed
-    this.inputField.addEventListener('keypress', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        this.handleSendMessage();
-      }
-    });
-
-    // Toggle chat minimization
-    this.toggleButton.addEventListener('click', () => {
-      this.toggleChat();
-    });
-  }
-
-  /**
-   * Get customer ID from Shopify if available
-   * @returns {string|null} Customer ID or null
-   */
-  getCustomerId() {
-    // Try to get from Shopify customer object if available
-    if (window.Shopify && window.Shopify.customer) {
-      return window.Shopify.customer.id;
-    }
-
-    // Otherwise return null (anonymous user)
-    return null;
-  }
-
-  /**
-   * Create a new conversation in Supabase
-   */
-  async createNewConversation() {
     try {
-      const { conversation, error } = await createConversation(this.shopId, this.customerId);
-
-      if (error) {
-        console.error('Error creating conversation:', error);
+      // Check if elements exist before adding event listeners
+      if (!this.sendButton || !this.inputField || !this.toggleButton) {
+        console.error('Cannot set up event listeners - UI elements not found:', {
+          sendButton: !this.sendButton,
+          inputField: !this.inputField,
+          toggleButton: !this.toggleButton
+        });
         return;
       }
 
-      this.conversationId = conversation.id;
-      console.log('Conversation created with ID:', this.conversationId);
-    } catch (error) {
-      console.error('Error in createNewConversation:', error);
-    }
-  }
-
-  /**
-   * Create a new cart in Shopify
-   */
-  async createNewCart() {
-    try {
-      const { cart, error } = await createCart();
-
-      if (error) {
-        console.error('Error creating cart:', error);
-        return;
+      // Send message when button is clicked
+      try {
+        this.sendButton.addEventListener('click', () => {
+          this.handleSendMessage();
+        });
+        console.log('Added click listener to send button');
+      } catch (error) {
+        console.error('Error adding click listener to send button:', error);
       }
 
-      this.cartId = cart.id;
-      console.log('Cart created with ID:', this.cartId);
+      // Send message when Enter key is pressed
+      try {
+        this.inputField.addEventListener('keypress', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            this.handleSendMessage();
+          }
+        });
+        console.log('Added keypress listener to input field');
+      } catch (error) {
+        console.error('Error adding keypress listener to input field:', error);
+      }
+
+      // Toggle chat minimization
+      try {
+        this.toggleButton.addEventListener('click', () => {
+          this.toggleChat();
+        });
+        console.log('Added click listener to toggle button');
+      } catch (error) {
+        console.error('Error adding click listener to toggle button:', error);
+      }
+
+      console.log('Event listeners successfully set up');
     } catch (error) {
-      console.error('Error in createNewCart:', error);
+      console.error('Error in setupEventListeners:', error);
     }
   }
 
   /**
-   * Add welcome message to the chat
+   * Add welcome message to the chat (direct HTML injection)
    */
-  addWelcomeMessage() {
-    const welcomeMessage = "Hello! I'm your shopping assistant. How can I help you today?";
-    this.addAssistantMessage(welcomeMessage);
+  addWelcomeMessageDirect() {
+    console.log('Adding welcome message directly');
 
-    // Store message in Supabase if conversation exists
-    if (this.conversationId) {
-      addMessage(this.conversationId, 'assistant', welcomeMessage)
-        .catch(error => console.error('Error storing welcome message:', error));
+    if (!this.messagesContainer) {
+      console.error('messagesContainer is null - cannot add welcome message');
+      return;
     }
+
+    // Create the date string manually
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()];
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const dateString = `${day} ${month} ${year}, ${hours}:${minutes}`;
+
+    // Create element directly
+    const messageElement = document.createElement('div');
+    messageElement.className = 'message assistant-message';
+
+    messageElement.innerHTML = `
+      <div class="message-content">
+        <p>Hello! I'm your shopping assistant. How can I help you today?</p>
+      </div>
+      <div class="message-time">${dateString}</div>
+    `;
+
+    this.messagesContainer.appendChild(messageElement);
+    console.log('Welcome message element added to container');
+
+    // Add to conversation history
+    this.conversationHistory.push({
+      role: 'assistant',
+      content: "Hello! I'm your shopping assistant. How can I help you today?"
+    });
   }
 
   /**
@@ -193,14 +264,10 @@ export class ChatWidget {
     // Clear input field
     this.inputField.value = '';
 
-    // Add user message to chat
-    this.addUserMessage(message);
+    console.log('Handling send message:', message);
 
-    // Store message in Supabase
-    if (this.conversationId) {
-      await addMessage(this.conversationId, 'user', message)
-        .catch(error => console.error('Error storing user message:', error));
-    }
+    // Directly add user message to chat
+    this.addUserMessageDirect(message);
 
     // Add to conversation history
     this.conversationHistory.push({
@@ -212,261 +279,206 @@ export class ChatWidget {
     this.setLoading(true);
 
     try {
-      // Check if this is likely a product search
-      if (isProductSearch(message)) {
-        await this.handleProductSearch(message);
-      } else {
-        await this.handleGeneralQuery(message);
+      // Prepare the request body
+      const requestBody = {
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 1024,
+        messages: [
+          ...this.conversationHistory
+        ]
+      };
+
+      console.log('Sending request to Claude API with body:', JSON.stringify(requestBody));
+
+      // Call the Claude API through our server proxy endpoint
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('Claude API response status:', response.status);
+
+      // Get response text for debugging
+      const responseText = await response.text();
+      console.log('Claude API raw response:', responseText);
+
+      // Parse the response
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse JSON response:', e);
+        throw new Error('Invalid JSON response from server');
       }
+
+      if (!response.ok) {
+        console.error('Error response from API:', data);
+        throw new Error(`API responded with status ${response.status}: ${JSON.stringify(data)}`);
+      }
+
+      console.log('Parsed Claude API response:', data);
+
+      if (!data.content || !data.content[0] || !data.content[0].text) {
+        console.error('Unexpected response format:', data);
+        throw new Error('Invalid response format from API');
+      }
+
+      const assistantResponse = data.content[0].text;
+      console.log('Assistant response:', assistantResponse);
+
+      // Add to conversation history
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: assistantResponse
+      });
+
+      // Directly add assistant message
+      this.addAssistantMessageDirect(assistantResponse);
+
     } catch (error) {
       console.error('Error processing message:', error);
-      this.addAssistantMessage('Sorry, I encountered an error. Please try again later.');
+
+      // Add error message directly
+      this.addAssistantMessageDirect('Sorry, I encountered an error. Please try again later. Technical details: ' + error.message);
     } finally {
       this.setLoading(false);
     }
   }
 
   /**
-   * Handle a product search query
+   * Add a user message directly to the chat
    * @param {string} message - User message
    */
-  async handleProductSearch(message) {
-    try {
-      // Extract search terms
-      const searchTerms = extractSearchTerms(message);
+  addUserMessageDirect(message) {
+    console.log('Adding user message directly:', message);
 
-      // Search for products
-      const { products, error } = await searchProducts(searchTerms);
+    // Create the date string manually
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()];
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const dateString = `${day} ${month} ${year}, ${hours}:${minutes}`;
 
-      if (error) {
-        throw new Error(error);
-      }
+    // Create message element
+    const messageElement = document.createElement('div');
+    messageElement.className = 'message user-message';
 
-      // Create context with products
-      const context = { products };
+    // Escape HTML in the message
+    const escapedMessage = this.escapeHtml(message);
 
-      // Get cart if available
-      if (this.cartId) {
-        const { cart } = await getCart(this.cartId);
-        if (cart) {
-          context.cart = cart;
-        }
-      }
+    messageElement.innerHTML = `
+      <div class="message-content">
+        <p>${escapedMessage}</p>
+      </div>
+      <div class="message-time">${dateString}</div>
+    `;
 
-      // Get AI response
-      const response = await sendMessageToClaude(
-        message,
-        this.conversationHistory,
-        context
-      );
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      // Add AI response to chat
-      this.addAssistantMessage(response.message);
-
-      // Store message in Supabase
-      if (this.conversationId) {
-        await addMessage(this.conversationId, 'assistant', response.message)
-          .catch(error => console.error('Error storing assistant message:', error));
-      }
-
-      // Add to conversation history
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response.message
-      });
-
-      // Display product cards if products were found
-      if (products && products.length > 0) {
-        this.displayProductCards(products);
-      }
-    } catch (error) {
-      console.error('Error in handleProductSearch:', error);
-      this.addAssistantMessage('Sorry, I had trouble searching for products. Please try again later.');
-    }
-  }
-
-  /**
-   * Handle a general query (non-product search)
-   * @param {string} message - User message
-   */
-  async handleGeneralQuery(message) {
-    try {
-      // Create context object
-      const context = {};
-
-      // Get cart if available
-      if (this.cartId) {
-        const { cart } = await getCart(this.cartId);
-        if (cart) {
-          context.cart = cart;
-        }
-      }
-
-      // Get AI response
-      const response = await sendMessageToClaude(
-        message,
-        this.conversationHistory,
-        context
-      );
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      // Add AI response to chat
-      this.addAssistantMessage(response.message);
-
-      // Store message in Supabase
-      if (this.conversationId) {
-        await addMessage(this.conversationId, 'assistant', response.message)
-          .catch(error => console.error('Error storing assistant message:', error));
-      }
-
-      // Add to conversation history
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response.message
-      });
-    } catch (error) {
-      console.error('Error in handleGeneralQuery:', error);
-      this.addAssistantMessage('Sorry, I encountered an error. Please try again later.');
-    }
-  }
-
-  /**
-   * Display product cards in chat
-   * @param {Array} products - Products to display
-   */
-  displayProductCards(products) {
-    // Create a container for product cards
-    const productCardsContainer = document.createElement('div');
-    productCardsContainer.className = 'product-cards-container';
-
-    // Add up to 3 product cards
-    const displayProducts = products.slice(0, 3);
-
-    displayProducts.forEach(product => {
-      const productCard = createProductCard(product, this.handleAddToCart.bind(this));
-      productCardsContainer.appendChild(productCard);
-    });
-
-    // Add to messages container
-    this.messagesContainer.appendChild(productCardsContainer);
-
-    // Scroll to bottom
+    this.messagesContainer.appendChild(messageElement);
     this.scrollToBottom();
   }
 
   /**
-   * Handle adding a product to cart
-   * @param {Object} product - Product to add
+   * Add an assistant message directly to the chat
+   * @param {string} message - Assistant message
    */
-  async handleAddToCart(product) {
-    if (!this.cartId || !product.variantId) {
-      console.error('Cart ID or variant ID is missing');
-      return;
-    }
+  addAssistantMessageDirect(message) {
+    console.log('Adding assistant message directly:', message);
 
-    try {
-      this.setLoading(true);
+    // Create the date string manually
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()];
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const dateString = `${day} ${month} ${year}, ${hours}:${minutes}`;
 
-      const lines = [{
-        merchandiseId: product.variantId,
-        quantity: 1
-      }];
+    // Create message element
+    const messageElement = document.createElement('div');
+    messageElement.className = 'message assistant-message';
 
-      const { cart, error } = await addToCart(this.cartId, lines);
+    // Format message with basic formatting
+    const formattedMessage = this.formatMessageText(message);
 
-      if (error) {
-        throw new Error(error);
-      }
+    messageElement.innerHTML = `
+      <div class="message-content">
+        <p>${formattedMessage}</p>
+      </div>
+      <div class="message-time">${dateString}</div>
+    `;
 
-      // Display success message
-      this.addAssistantMessage(`I've added "${product.title}" to your cart.`);
-
-      // Store message in Supabase
-      if (this.conversationId) {
-        await addMessage(this.conversationId, 'assistant', `I've added "${product.title}" to your cart.`)
-          .catch(error => console.error('Error storing assistant message:', error));
-      }
-
-      // Update conversation history
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: `I've added "${product.title}" to your cart.`
-      });
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      this.addAssistantMessage('Sorry, I had trouble adding that item to your cart. Please try again later.');
-    } finally {
-      this.setLoading(false);
-    }
-  }
-
-  /**
-   * Add a user message to the chat
-   * @param {string} content - Message content
-   */
-  addUserMessage(content) {
-    const message = createMessage({
-      content,
-      role: 'user',
-      timestamp: new Date()
-    });
-
-    this.messagesContainer.appendChild(message);
+    this.messagesContainer.appendChild(messageElement);
     this.scrollToBottom();
   }
 
   /**
-   * Add an assistant message to the chat
-   * @param {string} content - Message content
-   */
-  addAssistantMessage(content) {
-    const message = createMessage({
-      content,
-      role: 'assistant',
-      timestamp: new Date()
-    });
-
-    this.messagesContainer.appendChild(message);
-    this.scrollToBottom();
-  }
-
-  /**
-   * Set loading state
-   * @param {boolean} isLoading - Loading state
+   * Set the loading state
+   * @param {boolean} isLoading - Whether the widget is in loading state
    */
   setLoading(isLoading) {
     this.isLoading = isLoading;
 
-    // Disable/enable input field and send button
-    this.inputField.disabled = isLoading;
-    this.sendButton.disabled = isLoading;
-
-    // Remove existing loading indicator if any
-    const existingIndicator = document.querySelector('.loading-indicator');
-    if (existingIndicator) {
-      existingIndicator.remove();
-    }
-
-    // Add loading indicator if loading
     if (isLoading) {
-      const loadingIndicator = document.createElement('div');
-      loadingIndicator.className = 'loading-indicator';
-      loadingIndicator.innerHTML = `
-        <div class="loading-dot"></div>
-        <div class="loading-dot"></div>
-        <div class="loading-dot"></div>
-      `;
-
-      this.messagesContainer.appendChild(loadingIndicator);
+      const loadingElement = document.createElement('div');
+      loadingElement.className = 'message assistant-message loading';
+      loadingElement.innerHTML = '<div class="loading-indicator"><span></span><span></span><span></span></div>';
+      loadingElement.id = 'loading-message';
+      this.messagesContainer.appendChild(loadingElement);
       this.scrollToBottom();
+    } else {
+      const loadingElement = document.getElementById('loading-message');
+      if (loadingElement) {
+        loadingElement.remove();
+      }
     }
+  }
+
+  /**
+   * Scroll the messages container to the bottom
+   */
+  scrollToBottom() {
+    this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+  }
+
+  /**
+   * Format message text with basic Markdown-like formatting
+   * @param {string} text - Raw text
+   * @returns {string} Formatted HTML
+   */
+  formatMessageText(text) {
+    if (!text) return '';
+
+    // Escape HTML first
+    let formattedText = this.escapeHtml(text);
+
+    // Simple link formatting
+    formattedText = formattedText.replace(
+      /\[(.*?)\]\((https?:\/\/.*?)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+    // Convert line breaks to <br>
+    formattedText = formattedText.replace(/\n/g, '<br>');
+
+    return formattedText;
+  }
+
+  /**
+   * Escape HTML special characters
+   * @param {string} text - Raw text
+   * @returns {string} Escaped text
+   */
+  escapeHtml(text) {
+    if (!text) return '';
+
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   /**
@@ -476,33 +488,11 @@ export class ChatWidget {
     this.isMinimized = !this.isMinimized;
 
     if (this.isMinimized) {
-      this.messagesContainer.style.display = 'none';
-      this.inputField.style.display = 'none';
-      this.sendButton.style.display = 'none';
       this.container.classList.add('minimized');
-      this.toggleButton.innerText = '+';
+      this.toggleButton.textContent = '+';
     } else {
-      this.messagesContainer.style.display = 'flex';
-      this.inputField.style.display = 'block';
-      this.sendButton.style.display = 'block';
       this.container.classList.remove('minimized');
-      this.toggleButton.innerText = '-';
+      this.toggleButton.textContent = '-';
     }
   }
-
-  /**
-   * Scroll to the bottom of the chat
-   */
-  scrollToBottom() {
-    this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-  }
 }
-
-/**
- * Create and initialize chat widget
- */
-export const initChatWidget = () => {
-  const chatWidget = new ChatWidget();
-  chatWidget.init();
-  return chatWidget;
-};

@@ -23,47 +23,49 @@ export const formatPrice = (amount, currencyCode = 'USD') => {
 
 /**
  * Format a date for display
- * @param {string|Date} date - The date to format
- * @returns {string} Formatted date
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted date string
  */
-export const formatDate = (date) => {
-  if (!date) return '';
+export function formatDate(date) {
+  if (!date || !(date instanceof Date)) {
+    console.error('Invalid date provided to formatDate:', date);
+    return 'Invalid date';
+  }
 
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = new Intl.DateTimeFormat('en', { month: 'short' }).format(date);
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
 
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(dateObj);
+    return `${day} ${month} ${year}, ${hours}:${minutes}`;
   } catch (error) {
     console.error('Error formatting date:', error);
-    return String(date);
+    return 'Date error';
   }
-};
+}
 
 /**
  * Truncate text to a specified length
  * @param {string} text - The text to truncate
- * @param {number} maxLength - Maximum length
+ * @param {number} maxLength - Maximum length before truncation
  * @returns {string} Truncated text
  */
-export const truncateText = (text, maxLength = 100) => {
-  if (!text || text.length <= maxLength) return text || '';
-
-  return `${text.substring(0, maxLength)}...`;
-};
+export function truncateText(text, maxLength = 100) {
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+  return text.substring(0, maxLength) + '...';
+}
 
 /**
  * Generate a unique ID
  * @returns {string} Unique ID
  */
-export const generateId = () => {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
-};
+export function generateId() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
 
 /**
  * Parse product ID from Shopify Global ID
@@ -90,24 +92,19 @@ export const parseProductId = (globalId) => {
 };
 
 /**
- * Debounce a function call
- * @param {Function} func - Function to debounce
- * @param {number} wait - Wait time in milliseconds
+ * Debounce a function to limit how often it can be called
+ * @param {Function} func - The function to debounce
+ * @param {number} wait - The time to wait in milliseconds
  * @returns {Function} Debounced function
  */
-export const debounce = (func, wait = 300) => {
+export function debounce(func, wait) {
   let timeout;
-
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-
+  return function(...args) {
+    const context = this;
     clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
+    timeout = setTimeout(() => func.apply(context, args), wait);
   };
-};
+}
 
 /**
  * Store data in localStorage with expiration
@@ -153,3 +150,17 @@ export const getWithExpiry = (key) => {
     return null;
   }
 };
+
+/**
+ * Format currency amount
+ * @param {number} amount - The amount to format
+ * @param {string} currencyCode - Currency code (USD, GBP, etc.)
+ * @returns {string} Formatted currency string
+ */
+export function formatCurrency(amount, currencyCode = 'USD') {
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+  });
+  return formatter.format(amount);
+}

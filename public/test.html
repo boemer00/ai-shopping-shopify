@@ -3,47 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Shopping Assistant Test Page</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>AI Shopping Assistant - Test Page</title>
   <style>
     body {
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      background-color: #f7f9fc;
     }
-
-    .test-container {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
+    .container {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 0 1rem;
     }
-
-    .test-panel {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 20px;
-      background-color: #f9f9f9;
+    header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 1rem;
+      text-align: center;
     }
-
-    .test-panel h2 {
+    h1 {
       margin-top: 0;
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
     }
-
-    .test-button {
-      background-color: #5c6ac4;
+    .test-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      color: #2c3e50;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 0.5rem;
+      margin-top: 0;
+    }
+    iframe {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .button-group {
+      margin: 1rem 0;
+    }
+    button {
+      background-color: #3498db;
       color: white;
       border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
       cursor: pointer;
-      margin-right: 10px;
-      margin-bottom: 10px;
+      font-size: 1rem;
+      margin-right: 0.5rem;
     }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .log-area {
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 1rem;
+      height: 150px;
+      overflow-y: auto;
+      font-family: monospace;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Shopping Assistant - Test Page</h1>
+    <p>Use this page to test the functionality of the AI Shopping Assistant</p>
+  </header>
 
+  <div class="container">
+    <div class="test-section">
+      <h2>Application Preview</h2>
+      <iframe src="../src/index.html" frameborder="0"></iframe>
+    </div>
+
+    <div class="test-section">
+      <h2>Test Controls</h2>
+      <div class="button-group">
+        <button id="test-search">Test Search</button>
+        <button id="test-clear">Clear Results</button>
+        <button id="test-mock-data">Load Mock Data</button>
+      </div>
+      <div class="log-area" id="log-area">
     .test-button:hover {
       background-color: #202e78;
     }
@@ -122,12 +172,23 @@
       </div>
 
       <div class="input-group">
-        <label for="claude-key">Claude API Key (Optional):</label>
+        <label for="claude-key">Claude API Key (Required):</label>
         <input type="text" id="claude-key" placeholder="Enter your Claude API key">
+      </div>
+
+      <div class="input-group">
+        <label for="supabase-url">Supabase URL (Required):</label>
+        <input type="text" id="supabase-url" placeholder="Enter your Supabase URL">
+      </div>
+
+      <div class="input-group">
+        <label for="supabase-key">Supabase API Key (Required):</label>
+        <input type="text" id="supabase-key" placeholder="Enter your Supabase API key">
       </div>
 
       <button id="save-settings" class="test-button">Save Settings</button>
       <button id="reset-settings" class="test-button">Reset Settings</button>
+      <button id="test-claude" class="test-button">Test Claude API</button>
     </div>
 
     <div class="test-panel">
@@ -171,9 +232,35 @@
       const apiKeyInput = document.getElementById('api-key');
       const shopUrlInput = document.getElementById('shop-url');
       const claudeKeyInput = document.getElementById('claude-key');
+      const supabaseUrlInput = document.getElementById('supabase-url');
+      const supabaseKeyInput = document.getElementById('supabase-key');
+      const testClaudeButton = document.getElementById('test-claude');
 
       // Load saved settings if available
       const savedSettings = JSON.parse(localStorage.getItem('aiShopAssistant_settings') || '{}');
+
+      // Apply settings as soon as the page loads
+      function applySettings(settings) {
+        // Set environment variables for the app
+        window.SHOPIFY_STOREFRONT_ACCESS_TOKEN = settings.apiKey || '';
+        window.SHOPIFY_STORE_URL = settings.shopUrl || '';
+        window.CLAUDE_API_KEY = settings.claudeKey || '';
+        window.SUPABASE_URL = settings.supabaseUrl || '';
+        window.SUPABASE_KEY = settings.supabaseKey || '';
+
+        // Log the applied settings (without showing sensitive keys)
+        console.log('Applied settings:');
+        console.log('SHOPIFY_STOREFRONT_ACCESS_TOKEN:', settings.apiKey ? 'Set' : 'Not set');
+        console.log('SHOPIFY_STORE_URL:', settings.shopUrl || 'Not set');
+        console.log('CLAUDE_API_KEY:', settings.claudeKey ? 'Set' : 'Not set');
+        console.log('SUPABASE_URL:', settings.supabaseUrl || 'Not set');
+        console.log('SUPABASE_KEY:', settings.supabaseKey ? 'Set' : 'Not set');
+      }
+
+      // Apply settings immediately if they exist
+      if (Object.keys(savedSettings).length > 0) {
+        applySettings(savedSettings);
+      }
 
       if (savedSettings.apiKey) {
         apiKeyInput.value = savedSettings.apiKey;
@@ -187,22 +274,30 @@
         claudeKeyInput.value = savedSettings.claudeKey;
       }
 
+      if (savedSettings.supabaseUrl) {
+        supabaseUrlInput.value = savedSettings.supabaseUrl;
+      }
+
+      if (savedSettings.supabaseKey) {
+        supabaseKeyInput.value = savedSettings.supabaseKey;
+      }
+
       // Setup event listeners
       document.getElementById('save-settings').addEventListener('click', () => {
         const settings = {
           apiKey: apiKeyInput.value.trim(),
           shopUrl: shopUrlInput.value.trim(),
-          claudeKey: claudeKeyInput.value.trim()
+          claudeKey: claudeKeyInput.value.trim(),
+          supabaseUrl: supabaseUrlInput.value.trim(),
+          supabaseKey: supabaseKeyInput.value.trim()
         };
 
         localStorage.setItem('aiShopAssistant_settings', JSON.stringify(settings));
 
-        // Set environment variables for the app
-        window.SHOPIFY_STOREFRONT_ACCESS_TOKEN = settings.apiKey;
-        window.SHOPIFY_STORE_URL = settings.shopUrl;
-        window.CLAUDE_API_KEY = settings.claudeKey;
+        // Apply settings immediately
+        applySettings(settings);
 
-        alert('Settings saved! Refresh the page to apply changes.');
+        alert('Settings saved and applied!');
       });
 
       document.getElementById('reset-settings').addEventListener('click', () => {
@@ -210,7 +305,43 @@
         apiKeyInput.value = '';
         shopUrlInput.value = '';
         claudeKeyInput.value = '';
+        supabaseUrlInput.value = '';
+        supabaseKeyInput.value = '';
         alert('Settings reset!');
+      });
+
+      // Test Claude API connection directly
+      testClaudeButton.addEventListener('click', async () => {
+        if (!window.CLAUDE_API_KEY) {
+          alert('Please save your Claude API key first');
+          return;
+        }
+
+        testClaudeButton.disabled = true;
+        testClaudeButton.textContent = 'Testing...';
+
+        try {
+          // Use the global function exposed from bundle.js
+          if (typeof window.testClaudeConnection !== 'function') {
+            throw new Error('Test function not available. Make sure bundle.js is loaded.');
+          }
+
+          const result = await window.testClaudeConnection();
+
+          if (result.error) {
+            console.error('Claude API test failed:', result.error);
+            alert(`Claude API test failed: ${result.error}`);
+          } else {
+            console.log('Claude API test success:', result);
+            alert(`Claude API connection successful!\nResponse: ${result.message.slice(0, 50)}...`);
+          }
+        } catch (error) {
+          console.error('Error testing Claude API:', error);
+          alert(`Error testing Claude API: ${error.message}`);
+        } finally {
+          testClaudeButton.disabled = false;
+          testClaudeButton.textContent = 'Test Claude API';
+        }
       });
     });
   </script>

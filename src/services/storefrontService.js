@@ -5,8 +5,12 @@ import { GraphQLClient } from 'graphql-request';
  * @returns {GraphQLClient} The GraphQL client
  */
 export const createStorefrontClient = () => {
-  const accessToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || '';
-  const shopUrl = process.env.SHOPIFY_STORE_URL || '';
+  // Check for API key in window first (for browser environments), then try process.env (for Node environments)
+  const accessToken = window.SHOPIFY_STOREFRONT_ACCESS_TOKEN ||
+                     (typeof process !== 'undefined' && process.env ? process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN : '') || '';
+
+  const shopUrl = window.SHOPIFY_STORE_URL ||
+                 (typeof process !== 'undefined' && process.env ? process.env.SHOPIFY_STORE_URL : '') || '';
 
   if (!accessToken || !shopUrl) {
     console.error('Missing Shopify Storefront API credentials');

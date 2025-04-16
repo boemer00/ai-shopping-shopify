@@ -5,8 +5,12 @@ import { createClient } from '@supabase/supabase-js';
  * @returns {Object} Supabase client
  */
 export const initSupabase = () => {
-  const supabaseUrl = process.env.SUPABASE_URL || '';
-  const supabaseKey = process.env.SUPABASE_KEY || '';
+  // Check for API key in window first (for browser environments), then try process.env (for Node environments)
+  const supabaseUrl = window.SUPABASE_URL ||
+                     (typeof process !== 'undefined' && process.env ? process.env.SUPABASE_URL : '') || '';
+
+  const supabaseKey = window.SUPABASE_KEY ||
+                     (typeof process !== 'undefined' && process.env ? process.env.SUPABASE_KEY : '') || '';
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Missing Supabase credentials');

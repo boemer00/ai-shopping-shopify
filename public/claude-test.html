@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude API Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3a7bd5;
+        }
+        .response {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .error {
+            color: red;
+        }
+        .loading {
+            color: #777;
+            font-style: italic;
+        }
+        #apiKey {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Claude API Test</h1>
+        <div>
+            <label for="apiKey">Claude API Key:</label>
+            <input type="password" id="apiKey" placeholder="Enter your Claude API key">
+        </div>
+        <div>
+            <label for="userMessage">Your message:</label>
+            <textarea id="userMessage" placeholder="Type your message here...">Hello! How can you help me with shopping?</textarea>
+        </div>
+        <button id="sendButton">Send to Claude</button>
+        <div class="response" id="response">
+            <p>Response will appear here...</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiKeyInput = document.getElementById('apiKey');
+            const userMessageInput = document.getElementById('userMessage');
+            const sendButton = document.getElementById('sendButton');
+            const responseDiv = document.getElementById('response');
+
+            // Check for saved API key
+            const savedApiKey = localStorage.getItem('claudeApiKey');
+            if (savedApiKey) {
+                apiKeyInput.value = savedApiKey;
+            }
+
+            sendButton.addEventListener('click', async () => {
+                const apiKey = apiKeyInput.value.trim();
+                const userMessage = userMessageInput.value.trim();
+
+                if (!apiKey) {
+                    responseDiv.innerHTML = '<p class="error">Please enter your Claude API key</p>';
+                    return;
+                }
+
+                if (!userMessage) {
+                    responseDiv.innerHTML = '<p class="error">Please enter a message</p>';
+                    return;
+                }
+
+                // Save API key for convenience
+                localStorage.setItem('claudeApiKey', apiKey);
+
+                // Show loading state
+                responseDiv.innerHTML = '<p class="loading">Contacting Claude API...</p>';
+                sendButton.disabled = true;
+
+                try {
+                    const response = await fetch('/api/claude', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': apiKey
+                        },
+                        body: JSON.stringify({
+                            model: "claude-3-7-sonnet-20250219",
+                            max_tokens: 300,
+                            messages: [
+                                { role: 'user', content: userMessage }
+                            ]
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        responseDiv.innerHTML = `<p class="error">Error: ${data.error?.message || 'Unknown error'}</p>`;
+                    } else {
+                        responseDiv.innerHTML = `
+                            <h3>Claude's Response:</h3>
+                            <p>${data.content[0].text.replace(/\n/g, '<br>')}</p>
+                            <pre style="font-size: 12px; color: #777">Model: ${data.model}</pre>
+                        `;
+                    }
+                } catch (error) {
+                    responseDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+                    console.error('Error calling Claude API:', error);
+                } finally {
+                    sendButton.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

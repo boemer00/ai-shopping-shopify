@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Widget Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .chat-widget-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        .chat-widget-header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-widget-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .toggle-button {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            position: relative;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: #4a90e2;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .assistant-message {
+            align-self: flex-start;
+            background-color: #f1f1f1;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-content p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 10px;
+            opacity: 0.8;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #eee;
+            background-color: #fff;
+        }
+
+        .chat-input-container input {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 8px 15px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .chat-input-container button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 15px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Widget Test Page</h1>
+    <p>This page tests the chat widget functionality without any external dependencies.</p>
+
+    <div id="ai-shopping-assistant" class="chat-widget-container">
+        <div class="chat-widget-header">
+            <h3>Shopping Assistant</h3>
+            <button id="toggle-chat" class="toggle-button">-</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Hardcoded messages for testing -->
+            <div class="message assistant-message">
+                <div class="message-content">
+                    <p>Hello! I'm your shopping assistant. How can I help you today?</p>
+                </div>
+                <div class="message-time">13 Apr 2025, 10:25</div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Ask about products...">
+            <button id="send-message">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Simple standalone chat widget functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Test page loaded');
+
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-message');
+            const messagesContainer = document.getElementById('chat-messages');
+            const toggleButton = document.getElementById('toggle-chat');
+            const chatContainer = document.getElementById('ai-shopping-assistant');
+
+            console.log('Chat elements found:', !!chatInput, !!sendButton, !!messagesContainer, !!toggleButton);
+
+            // Send message
+            function sendMessage() {
+                const message = chatInput.value.trim();
+                if (!message) return;
+
+                // Add user message
+                addUserMessage(message);
+
+                // Clear input
+                chatInput.value = '';
+
+                // Add fake response after delay
+                setTimeout(() => {
+                    addAssistantMessage(`This is a test response to: "${message}"`);
+                }, 500);
+            }
+
+            // Add user message
+            function addUserMessage(message) {
+                const element = document.createElement('div');
+                element.className = 'message user-message';
+
+                const time = new Date();
+                const hours = time.getHours().toString().padStart(2, '0');
+                const minutes = time.getMinutes().toString().padStart(2, '0');
+
+                element.innerHTML = `
+                    <div class="message-content">
+                        <p>${message}</p>
+                    </div>
+                    <div class="message-time">${formatDate(time)}</div>
+                `;
+
+                messagesContainer.appendChild(element);
+                scrollToBottom();
+            }
+
+            // Add assistant message
+            function addAssistantMessage(message) {
+                const element = document.createElement('div');
+                element.className = 'message assistant-message';
+
+                const time = new Date();
+
+                element.innerHTML = `
+                    <div class="message-content">
+                        <p>${message}</p>
+                    </div>
+                    <div class="message-time">${formatDate(time)}</div>
+                `;
+
+                messagesContainer.appendChild(element);
+                scrollToBottom();
+            }
+
+            // Format date
+            function formatDate(date) {
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()];
+                const year = date.getFullYear();
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+
+                return `${day} ${month} ${year}, ${hours}:${minutes}`;
+            }
+
+            // Scroll to bottom
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            // Toggle chat
+            toggleButton.addEventListener('click', () => {
+                chatContainer.classList.toggle('minimized');
+                toggleButton.textContent = chatContainer.classList.contains('minimized') ? '+' : '-';
+            });
+
+            // Send when button clicked
+            sendButton.addEventListener('click', sendMessage);
+
+            // Send when Enter pressed
+            chatInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Initial scroll to bottom
+            scrollToBottom();
+        });
+    </script>
+</body>
+</html>

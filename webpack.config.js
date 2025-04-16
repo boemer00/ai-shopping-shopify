@@ -30,6 +30,9 @@ module.exports = {
       directory: path.join(__dirname, 'public'),
     },
     compress: true,
-    port: 3000,
+    port: 8082,
+    proxy: {
+      '/api': 'http://localhost:8000'
+    }
   },
 };
