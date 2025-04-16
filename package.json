@@ -2,7 +2,7 @@
   "name": "ai-shopping-shopify",
   "version": "1.0.0",
   "description": "AI Shopping Assistant for Shopify stores using Claude API",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
@@ -10,7 +10,11 @@
     "lint": "eslint src/**/*.js",
     "start": "node server.js",
     "dev:client": "webpack serve --mode development",
-    "dev:server": "nodemon server.js"
+    "dev:server": "nodemon server.js",
+    "vercel-build": "npm run build"
+  },
+  "engines": {
+    "node": "18.x || 20.x"
   },
   "keywords": [
     "shopify",
