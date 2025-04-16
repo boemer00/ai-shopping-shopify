@@ -1,2 +1,12 @@
 node_modules
 .env
+.env.local
+.DS_Store
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.vscode/
+.idea/
+dist/
+build/
+ai-assistant-v0/
