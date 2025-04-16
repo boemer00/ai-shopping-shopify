@@ -1,0 +1,27 @@
+<!-- AI Shopping Assistant Widget -->
+<div id="ai-shopping-assistant" class="chat-widget-container"></div>
+
+<script>
+  // Set global variables
+  window.SHOPIFY_STORE_URL = "{{ shop.domain }}";
+  window.SHOPIFY_STOREFRONT_ACCESS_TOKEN = "{{ settings.storefront_api_token }}";
+  window.CLAUDE_API_KEY = "{{ settings.claude_api_key }}"; // Would typically be handled server-side
+</script>
+
+<!-- Load the app bundle from Vercel deployment -->
+<link rel="stylesheet" href="{{ settings.app_url }}/styles.css">
+<script src="{{ settings.app_url }}/bundle.js" defer></script>
+
+<style>
+  /* Optional custom styling overrides */
+  .chat-widget-container {
+    z-index: 1000;
+    /* Additional custom styles */
+  }
+</style>
+
+{% comment %}
+Integration instructions:
+1. Add this snippet to your theme using: {% render 'ai-shopping-assistant' %}
+2. Configure the app settings in Theme Settings
+{% endcomment %}

@@ -8,6 +8,7 @@ import './js/app.js';
 import { initChatWidget } from './components/ChatWidget';
 import { initAppBridge } from './services/appBridgeService';
 import { testClaudeConnection } from './services/claudeService';
+import { initShopifyAppEmbed } from './components/ShopifyAppEmbed';
 
 // For debugging
 console.log('index.js loaded');
@@ -17,34 +18,56 @@ const init = () => {
   console.log('AI Shopping application initialization started');
 
   try {
-    // Check if we're running in standalone mode or integrated mode
+    // Check if we're running in Shopify admin via App Bridge
     const appBridgeElement = document.getElementById('shopify-app-bridge');
-    const isStandalone = !appBridgeElement;
-    console.log('Running in', isStandalone ? 'standalone mode' : 'integrated mode');
+    const isAppBridgeMode = !!appBridgeElement;
 
-    if (!isStandalone && appBridgeElement) {
-      // Initialize App Bridge for Shopify
+    // Check if we're running in a Shopify storefront
+    const isStorefrontMode = window.location.href.includes('myshopify.com') ||
+                            new URLSearchParams(window.location.search).has('shop') ||
+                            (window.Shopify && window.Shopify.shop);
+
+    // Determine operating mode
+    const isStandalone = !isAppBridgeMode && !isStorefrontMode;
+
+    console.log('Running in',
+      isAppBridgeMode ? 'Shopify admin mode' :
+      isStorefrontMode ? 'Shopify storefront mode' :
+      'standalone mode'
+    );
+
+    // Set up application based on mode
+    if (isAppBridgeMode) {
+      // Initialize App Bridge for Shopify Admin
       try {
         const appBridge = initAppBridge();
         console.log('App Bridge initialized');
       } catch (e) {
         console.error('Failed to initialize App Bridge:', e);
       }
-    }
-
-    // Initialize the chat widget if needed elements exist
-    const chatContainer = document.getElementById('ai-shopping-assistant');
-    if (chatContainer) {
-      console.log('Initializing chat widget');
+    } else if (isStorefrontMode) {
+      // Initialize Shopify storefront embed
       try {
-        const chatWidget = initChatWidget();
-        window.aiShopAssistant = chatWidget;
-        console.log('Chat widget initialized and exposed as window.aiShopAssistant');
+        const shopifyEmbed = initShopifyAppEmbed();
+        console.log('Shopify embed initialized');
       } catch (e) {
-        console.error('Failed to initialize chat widget:', e);
+        console.error('Failed to initialize Shopify embed:', e);
       }
     } else {
-      console.log('Chat widget container not found in the DOM');
+      // Initialize standalone chat widget if container exists
+      const chatContainer = document.getElementById('ai-shopping-assistant');
+      if (chatContainer) {
+        console.log('Initializing chat widget in standalone mode');
+        try {
+          const chatWidget = initChatWidget();
+          window.aiShopAssistant = chatWidget;
+          console.log('Chat widget initialized and exposed as window.aiShopAssistant');
+        } catch (e) {
+          console.error('Failed to initialize chat widget:', e);
+        }
+      } else {
+        console.log('Chat widget container not found in the DOM');
+      }
     }
 
     // Expose test functions globally for the test page

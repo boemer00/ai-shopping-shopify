@@ -27,6 +27,9 @@ const getAllowedOrigins = () => {
     origins.push(`https://${process.env.SHOPIFY_STORE_URL}`);
   }
 
+  // For embedded usage in any Shopify store
+  origins.push('https://*.myshopify.com');
+
   return origins;
 };
 
@@ -41,7 +44,19 @@ const corsOptions = {
     }
 
     // Allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // Allow any myshopify.com domain
+    if (origin.includes('myshopify.com')) {
+      callback(null, true);
+      return;
+    }
+
+    // Check against allowlist
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.log('CORS blocked for origin:', origin);
@@ -114,6 +129,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Embed route for Shopify storefront integration
+app.get('/embed', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'embed.html'));
+});
+
 // Test page route
 app.get('/test', (req, res) => {
   const testFilePath = path.join(__dirname, 'public', 'test.html');
@@ -166,6 +186,24 @@ app.get('/api/test', (req, res) => {
       hasSupabaseUrl: !!process.env.SUPABASE_URL,
       nodeEnv: process.env.NODE_ENV || 'not set'
     }
+  });
+});
+
+// Shopify storefront settings endpoint
+app.get('/api/shopify-settings', (req, res) => {
+  // Verify the request is coming from a valid Shopify store
+  const shop = req.query.shop;
+
+  if (!shop || !shop.includes('myshopify.com')) {
+    return res.status(400).json({ error: 'Invalid shop parameter' });
+  }
+
+  // Return public settings for the widget
+  res.json({
+    shopUrl: process.env.SHOPIFY_STORE_URL || shop,
+    appUrl: process.env.APP_URL || 'https://ai-shopping-shopify.vercel.app',
+    hasStorefrontToken: !!process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+    hasClaudeKey: !!process.env.CLAUDE_API_KEY
   });
 });
 
