@@ -221,28 +221,64 @@ class ChatWidget {
    */
   async createNewConversation() {
     try {
+      // Check if Supabase credentials are available
+      if (!window.SUPABASE_URL || !window.SUPABASE_KEY) {
+        console.error('Supabase credentials missing! Please set window.SUPABASE_URL and window.SUPABASE_KEY');
+
+        // Use a fallback random ID if Supabase is not available
+        // This allows the chat to work without Supabase, though messages won't be persisted server-side
+        this.conversationId = 'local-' + Date.now().toString();
+        console.log('Created local fallback conversation ID:', this.conversationId);
+
+        // Save the conversation locally even without Supabase
+        this.saveConversationToStorage();
+        return;
+      }
+
       if (!this.shopId) {
         console.warn('Shop ID not available, using default');
         this.shopId = 'default-shop';
       }
 
       console.log('Creating new conversation with shop ID:', this.shopId);
+      console.log('Using Supabase URL:', window.SUPABASE_URL.substring(0, 20) + '...');
+
       const { conversation, error } = await createConversation(this.shopId, this.customerId);
 
       if (error) {
-        console.error('Error creating conversation:', error);
+        console.error('Error creating conversation in Supabase:', error);
+
+        // Use a fallback random ID if Supabase operation fails
+        this.conversationId = 'local-' + Date.now().toString();
+        console.log('Created local fallback conversation ID after Supabase error:', this.conversationId);
+
+        // Save the conversation locally even without Supabase
+        this.saveConversationToStorage();
         return;
       }
 
       if (conversation) {
         this.conversationId = conversation.id;
-        console.log('New conversation created with ID:', this.conversationId);
+        console.log('New conversation created in Supabase with ID:', this.conversationId);
 
         // Save to localStorage immediately after creating a new conversation
+        this.saveConversationToStorage();
+      } else {
+        console.error('No conversation returned from Supabase and no error - unexpected behavior');
+
+        // Fallback to local ID
+        this.conversationId = 'local-' + Date.now().toString();
         this.saveConversationToStorage();
       }
     } catch (error) {
       console.error('Error in createNewConversation:', error);
+
+      // Use a fallback random ID if an exception occurs
+      this.conversationId = 'local-' + Date.now().toString();
+      console.log('Created local fallback conversation ID after exception:', this.conversationId);
+
+      // Save the conversation locally even without Supabase
+      this.saveConversationToStorage();
     }
   }
 
@@ -444,6 +480,18 @@ class ChatWidget {
         return;
       }
 
+      // If this is a local-only conversation (not from Supabase), skip saving to Supabase
+      if (this.conversationId.startsWith('local-')) {
+        console.log(`Skipping Supabase save for ${role} message in local-only conversation`);
+        return;
+      }
+
+      // Check if Supabase credentials are available
+      if (!window.SUPABASE_URL || !window.SUPABASE_KEY) {
+        console.warn('Supabase credentials missing, skipping message save to database');
+        return;
+      }
+
       console.log(`Saving ${role} message to Supabase:`, content.substring(0, 30) + '...');
       const { message, error } = await addMessage(this.conversationId, role, content);
 
@@ -452,7 +500,7 @@ class ChatWidget {
         return;
       }
 
-      console.log('Message saved successfully with ID:', message?.id);
+      console.log('Message saved successfully to Supabase with ID:', message?.id);
     } catch (error) {
       console.error('Error in saveMessageToSupabase:', error);
     }
