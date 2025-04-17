@@ -163,10 +163,12 @@ class ChatWidget {
       }
 
       // Try to restore conversation from storage first
+      console.log('Attempting to restore conversation from localStorage...');
       const restored = this.restoreConversationFromStorage();
 
       if (!restored) {
         // If we couldn't restore, create a new conversation in Supabase
+        console.log('No existing conversation found in localStorage, creating a new one');
         await this.createNewConversation();
 
         // Load previous messages if available
@@ -182,6 +184,8 @@ class ChatWidget {
         } else {
           console.log('Skipping welcome message, conversation already has messages');
         }
+      } else {
+        console.log('Successfully restored existing conversation from localStorage');
       }
 
       // Set up event listeners
@@ -707,7 +711,14 @@ class ChatWidget {
     try {
       // Don't save if no conversation ID
       if (!this.conversationId) {
+        console.warn('No conversation ID available, cannot save to localStorage');
         return;
+      }
+
+      // Ensure we have a valid shop ID
+      if (!this.shopId) {
+        console.warn('No shop ID available, using default for localStorage');
+        this.shopId = 'default-shop';
       }
 
       const conversationData = {
@@ -719,7 +730,7 @@ class ChatWidget {
       };
 
       localStorage.setItem('aiShoppingAssistant_conversation', JSON.stringify(conversationData));
-      console.log('Conversation saved to localStorage');
+      console.log(`Conversation saved to localStorage: ID ${this.conversationId} with ${this.conversationHistory.length} messages`);
     } catch (error) {
       console.error('Error saving conversation to localStorage:', error);
     }
@@ -752,6 +763,8 @@ class ChatWidget {
 
       // Restore conversation data
       this.conversationId = conversationData.conversationId;
+      this.shopId = conversationData.shopId || this.shopId;
+      this.customerId = conversationData.customerId || this.customerId;
       this.conversationHistory = conversationData.conversationHistory || [];
 
       // Display messages from history in the UI
@@ -773,14 +786,17 @@ class ChatWidget {
    */
   displayConversationHistory() {
     if (!this.messagesContainer || !this.conversationHistory || this.conversationHistory.length === 0) {
+      console.log('Nothing to display: messagesContainer, conversationHistory, or messages missing');
       return;
     }
+
+    console.log(`Displaying ${this.conversationHistory.length} messages from restored conversation ${this.conversationId}`);
 
     // Clear existing messages
     this.messagesContainer.innerHTML = '';
 
     // Add each message to the UI
-    this.conversationHistory.forEach(message => {
+    this.conversationHistory.forEach((message, index) => {
       if (message.role === 'user') {
         this.addUserMessageDirect(message.content, false); // Don't scroll on each message
       } else if (message.role === 'assistant') {

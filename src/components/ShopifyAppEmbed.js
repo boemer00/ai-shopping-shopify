@@ -121,6 +121,21 @@ const ensureChatContainer = () => {
     `;
 
     document.body.appendChild(container);
+
+    // Log conversation status for debugging
+    const storedData = localStorage.getItem('aiShoppingAssistant_conversation');
+    if (storedData) {
+      try {
+        const data = JSON.parse(storedData);
+        console.log('Found stored conversation in localStorage:',
+                    data.conversationId,
+                    `with ${data.conversationHistory.length} messages`);
+      } catch (e) {
+        console.error('Error parsing stored conversation:', e);
+      }
+    } else {
+      console.log('No stored conversation found in localStorage');
+    }
   }
 
   return container;
