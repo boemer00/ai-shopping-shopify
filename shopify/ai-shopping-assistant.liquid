@@ -1,11 +1,48 @@
 <!-- AI Shopping Assistant Widget -->
-<div id="ai-shopping-assistant" class="chat-widget-container"></div>
+<iframe
+  id="ai-shopping-assistant-frame"
+  src="https://ai-shopping-shopify.vercel.app/embed?shop={{ shop.domain | url_encode }}&token={{ settings.storefront_api_token | url_encode }}"
+  style="position: fixed; bottom: 20px; right: 20px; width: 350px; height: 500px; border: none; z-index: 1000; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: white; transition: all 0.3s ease;"
+  frameborder="0"
+  allow="clipboard-write"
+></iframe>
 
 <script>
-  // Set global variables
-  window.SHOPIFY_STORE_URL = "{{ shop.domain }}";
-  window.SHOPIFY_STOREFRONT_ACCESS_TOKEN = "{{ settings.storefront_api_token }}";
-  window.CLAUDE_API_KEY = "{{ settings.claude_api_key }}"; // Would typically be handled server-side
+  // Error handling for iframe load failures
+  document.addEventListener('DOMContentLoaded', function() {
+    const iframe = document.getElementById('ai-shopping-assistant-frame');
+
+    // Check if iframe loads successfully
+    iframe.addEventListener('load', function() {
+      console.log('AI Shopping Assistant iframe loaded successfully');
+    });
+
+    // Handle errors
+    iframe.addEventListener('error', function() {
+      console.error('Failed to load AI Shopping Assistant iframe');
+
+      // Replace iframe with a simple button that opens in new tab
+      const parent = iframe.parentNode;
+      const chatButton = document.createElement('div');
+      chatButton.innerHTML = `
+        <a href="https://ai-shopping-shopify.vercel.app/test?shop={{ shop.domain | url_encode }}" target="_blank"
+          style="position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%;
+          background-color: #4a90e2; color: white; display: flex; align-items: center; justify-content: center;
+          text-decoration: none; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000;">
+          Chat
+        </a>
+      `;
+      parent.replaceChild(chatButton.firstElementChild, iframe);
+    });
+
+    // Add timeout to handle case where iframe doesn't load
+    setTimeout(function() {
+      if (!iframe.contentWindow || !iframe.contentWindow.document.body) {
+        const errorEvent = new Event('error');
+        iframe.dispatchEvent(errorEvent);
+      }
+    }, 5000);
+  });
 </script>
 
 <!-- Load the app bundle from Vercel deployment -->
