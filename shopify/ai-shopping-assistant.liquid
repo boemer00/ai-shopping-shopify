@@ -1,9 +1,10 @@
 <!-- AI Shopping Assistant Widget -->
 <iframe
   id="ai-shopping-assistant-frame"
-  src="https://ai-shopping-shopify.vercel.app/embed?shop={{ shop.domain | url_encode }}&token={{ settings.storefront_api_token | url_encode }}"
+  src="https://ai-shopping-shopify.vercel.app/embed?shop={{ shop.domain | url_encode }}&token={{ settings.storefront_api_token | url_encode }}&session={{ 'now' | date: '%s' }}"
   style="position: fixed; bottom: 20px; right: 20px; width: 350px; height: 500px; border: none; z-index: 1000; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: white; transition: all 0.3s ease;"
   frameborder="0"
+  loading="lazy"
   allow="clipboard-write"
 ></iframe>
 
@@ -45,9 +46,11 @@
   });
 </script>
 
-<!-- Load the app bundle from Vercel deployment -->
+<!-- Remove the additional bundle loading since the iframe loads its own version -->
+<!--
 <link rel="stylesheet" href="{{ settings.app_url }}/styles.css">
 <script src="{{ settings.app_url }}/bundle.js" defer></script>
+-->
 
 <style>
   /* Optional custom styling overrides */

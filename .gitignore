@@ -10,3 +10,4 @@ yarn-error.log
 dist/
 build/
 ai-assistant-v0/
+.vercel
