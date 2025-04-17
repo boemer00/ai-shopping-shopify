@@ -1,8 +1,6 @@
 import { formatDate } from '../utils/helpers';
 import { createConversation, addMessage, getMessages } from '../services/supabaseService';
-
-// Constant for localStorage key to ensure consistency
-const STORAGE_KEY = 'aiShoppingAssistant_conversation';
+import { saveConversation, loadConversation } from '../utils/storage';
 
 /**
  * Initialize the chat widget
@@ -11,20 +9,27 @@ const STORAGE_KEY = 'aiShoppingAssistant_conversation';
 export const initChatWidget = () => {
   console.log('Initializing chat widget...');
 
-  // Check if DOM is ready
-  if (document.readyState === 'loading') {
-    console.log('Document still loading, deferring chat widget initialization');
-    return null;
-  }
-
+  // Create widget instance
   const chatWidget = new ChatWidget();
 
-  // Initialize async with setTimeout to ensure DOM is fully ready
-  setTimeout(() => {
-    chatWidget.init();
-  }, 100);
+  // Define initialization function
+  const go = () => {
+    // Initialize async with setTimeout to ensure DOM is fully ready
+    setTimeout(() => {
+      chatWidget.init();
+    }, 100);
+  };
 
-  console.log('Chat widget initialized');
+  // Run initialization based on document state
+  if (document.readyState === 'loading') {
+    console.log('Document still loading, will initialize when DOM content loaded');
+    document.addEventListener('DOMContentLoaded', go);
+  } else {
+    console.log('Document already loaded, initializing now');
+    go();
+  }
+
+  console.log('Chat widget initialization scheduled');
   return chatWidget;
 };
 
@@ -172,7 +177,7 @@ class ChatWidget {
         console.log('No existing conversation found in localStorage, creating a new one');
         await this.createNewConversation();
 
-        // Load previous messages if available
+        // Load previous messages if available (unlikely in this case)
         await this.loadMessages();
 
         // Add welcome message if no previous messages and no existing welcome message
@@ -186,7 +191,19 @@ class ChatWidget {
           console.log('Skipping welcome message, conversation already has messages');
         }
       } else {
-        console.log('Successfully restored existing conversation from localStorage');
+        console.log('Successfully restored existing conversation');
+
+        // If we have a conversation ID but no history (from cookie), load messages from Supabase
+        if (this.conversationId && this.conversationHistory.length === 0) {
+          console.log('Found conversation ID but no history, loading messages from Supabase');
+          await this.loadMessages();
+
+          // If still no messages, this might be a new conversation
+          if (this.conversationHistory.length === 0) {
+            console.log('No messages found after loading, adding welcome message');
+            this.addWelcomeMessageDirect();
+          }
+        }
       }
 
       // Set up event listeners
@@ -220,6 +237,9 @@ class ChatWidget {
       if (conversation) {
         this.conversationId = conversation.id;
         console.log('New conversation created with ID:', this.conversationId);
+
+        // Save to localStorage immediately after creating a new conversation
+        this.saveConversationToStorage();
       }
     } catch (error) {
       console.error('Error in createNewConversation:', error);
@@ -267,6 +287,9 @@ class ChatWidget {
         });
 
         console.log('Messages loaded and displayed');
+
+        // Save to localStorage to ensure persistence across page loads
+        this.saveConversationToStorage();
       } else {
         console.log('No previous messages found');
       }
@@ -730,10 +753,12 @@ class ChatWidget {
         timestamp: new Date().getTime()
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationData));
-      console.log(`Conversation saved to localStorage: ID ${this.conversationId} with ${this.conversationHistory.length} messages`);
+      // Use our utility function to save to both localStorage and cookie
+      saveConversation(conversationData);
+
+      console.log(`Conversation saved: ID ${this.conversationId} with ${this.conversationHistory.length} messages`);
     } catch (error) {
-      console.error('Error saving conversation to localStorage:', error);
+      console.error('Error saving conversation to storage:', error);
     }
   }
 
@@ -743,41 +768,53 @@ class ChatWidget {
    */
   restoreConversationFromStorage() {
     try {
-      const storedData = localStorage.getItem(STORAGE_KEY);
-      if (!storedData) {
+      // Use our utility function to load from localStorage or cookie
+      const result = loadConversation();
+
+      if (!result) {
         console.log('No stored conversation found');
         return false;
       }
 
-      const conversationData = JSON.parse(storedData);
+      const { source, data, conversationId } = result;
 
-      // Check if data is still valid (not older than 24 hours)
-      const now = new Date().getTime();
-      const storedTime = conversationData.timestamp || 0;
-      const hoursSinceStored = (now - storedTime) / (1000 * 60 * 60);
+      if (source === 'localStorage' && data) {
+        // Check if data is still valid (not older than 24 hours)
+        const now = new Date().getTime();
+        const storedTime = data.timestamp || 0;
+        const hoursSinceStored = (now - storedTime) / (1000 * 60 * 60);
 
-      if (hoursSinceStored > 24) {
-        console.log('Stored conversation is too old (>24 hours), starting a new one');
-        localStorage.removeItem(STORAGE_KEY);
-        return false;
+        if (hoursSinceStored > 24) {
+          console.log('Stored conversation is too old (>24 hours), starting a new one');
+          return false;
+        }
+
+        // Restore full data from localStorage
+        this.conversationId = data.conversationId;
+        this.shopId = data.shopId || this.shopId;
+        this.customerId = data.customerId || this.customerId;
+        this.conversationHistory = data.conversationHistory || [];
+
+        // Display messages from history in the UI
+        this.displayConversationHistory();
+
+        console.log('Conversation restored from localStorage:',
+          this.conversationId,
+          `(${this.conversationHistory.length} messages)`
+        );
+        return true;
+      }
+      else if (source === 'cookie') {
+        // We only have the ID from cookie, set it and return true
+        // Messages will be loaded from Supabase later
+        this.conversationId = conversationId;
+        console.log('Found conversationId in cookie:', conversationId);
+        return true;
       }
 
-      // Restore conversation data
-      this.conversationId = conversationData.conversationId;
-      this.shopId = conversationData.shopId || this.shopId;
-      this.customerId = conversationData.customerId || this.customerId;
-      this.conversationHistory = conversationData.conversationHistory || [];
-
-      // Display messages from history in the UI
-      this.displayConversationHistory();
-
-      console.log('Conversation restored from localStorage:',
-        this.conversationId,
-        `(${this.conversationHistory.length} messages)`
-      );
-      return true;
+      return false;
     } catch (error) {
-      console.error('Error restoring conversation from localStorage:', error);
+      console.error('Error restoring conversation from storage:', error);
       return false;
     }
   }

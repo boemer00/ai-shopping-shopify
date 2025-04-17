@@ -2,12 +2,10 @@
  * Shopify App Embed Component - Handles embedding the chat widget in Shopify storefronts
  */
 import { initChatWidget } from './ChatWidget';
+import { STORAGE_KEY, loadConversation } from '../utils/storage';
 
 // Track initialization status
 let isShopifyEmbedInitialized = false;
-
-// Same localStorage key as in ChatWidget.js to ensure consistency
-const STORAGE_KEY = 'aiShoppingAssistant_conversation';
 
 /**
  * Initialize the Shopify app embed
@@ -121,19 +119,26 @@ const ensureChatContainer = () => {
 
     document.body.appendChild(container);
 
-    // Log conversation status for debugging
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    if (storedData) {
+    // Check for existing conversation using our new utils
+    const conversationData = loadConversation();
+    if (conversationData) {
       try {
-        const data = JSON.parse(storedData);
-        console.log('Found stored conversation in localStorage:',
-                    data.conversationId,
-                    `with ${data.conversationHistory.length} messages`);
+        const source = conversationData.source;
+        const conversationId = conversationData.conversationId;
+
+        if (source === 'localStorage' && conversationData.data) {
+          const messageCount = conversationData.data.conversationHistory.length;
+          console.log(`Found stored conversation in ${source}:`,
+                      conversationId,
+                      `with ${messageCount} messages`);
+        } else if (source === 'cookie') {
+          console.log(`Found conversation ID ${conversationId} in cookie`);
+        }
       } catch (e) {
         console.error('Error parsing stored conversation:', e);
       }
     } else {
-      console.log('No stored conversation found in localStorage');
+      console.log('No stored conversation found');
     }
   }
 
