@@ -111,6 +111,19 @@
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'AI_ASSISTANT_LOADED' }, '*');
       }
+
+      // Log localStorage state on page load for debugging
+      try {
+        const stored = localStorage.getItem('aiShoppingAssistant_conversation');
+        if (stored) {
+          const data = JSON.parse(stored);
+          console.log('Found existing conversation in localStorage on page load:',
+                     data.conversationId,
+                     `with ${data.conversationHistory.length} messages`);
+        }
+      } catch (e) {
+        console.error('Error checking localStorage on page load:', e);
+      }
     });
 
     // Handle errors gracefully

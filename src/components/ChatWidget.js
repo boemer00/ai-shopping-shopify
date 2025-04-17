@@ -1,6 +1,9 @@
 import { formatDate } from '../utils/helpers';
 import { createConversation, addMessage, getMessages } from '../services/supabaseService';
 
+// Constant for localStorage key to ensure consistency
+const STORAGE_KEY = 'aiShoppingAssistant_conversation';
+
 /**
  * Initialize the chat widget
  * @returns {Object} The chat widget instance
@@ -126,7 +129,6 @@ class ChatWidget {
             <button id="toggle-chat" class="toggle-button">-</button>
           </div>
           <div class="chat-messages" id="chat-messages">
-            ${existingContent}
           </div>
           <div class="chat-input-container">
             <input type="text" id="chat-input" placeholder="Ask about products...">
@@ -154,12 +156,11 @@ class ChatWidget {
         return;
       }
 
-      // Clear any existing messages from the container (to prevent duplicates)
-      // Only keep loading indicators
-      const existingMessages = this.messagesContainer.querySelectorAll('.message:not(.loading)');
-      if (existingMessages.length > 0) {
-        console.log(`Found ${existingMessages.length} existing messages, clearing them to prevent duplicates`);
-        existingMessages.forEach(msg => msg.remove());
+      // Remove any loading indicators that might be present
+      const loadingIndicators = this.messagesContainer.querySelectorAll('.loading-indicator');
+      if (loadingIndicators.length > 0) {
+        console.log(`Removing ${loadingIndicators.length} loading indicators before initialization`);
+        loadingIndicators.forEach(indicator => indicator.remove());
       }
 
       // Try to restore conversation from storage first
@@ -729,7 +730,7 @@ class ChatWidget {
         timestamp: new Date().getTime()
       };
 
-      localStorage.setItem('aiShoppingAssistant_conversation', JSON.stringify(conversationData));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationData));
       console.log(`Conversation saved to localStorage: ID ${this.conversationId} with ${this.conversationHistory.length} messages`);
     } catch (error) {
       console.error('Error saving conversation to localStorage:', error);
@@ -742,7 +743,7 @@ class ChatWidget {
    */
   restoreConversationFromStorage() {
     try {
-      const storedData = localStorage.getItem('aiShoppingAssistant_conversation');
+      const storedData = localStorage.getItem(STORAGE_KEY);
       if (!storedData) {
         console.log('No stored conversation found');
         return false;
@@ -757,7 +758,7 @@ class ChatWidget {
 
       if (hoursSinceStored > 24) {
         console.log('Stored conversation is too old (>24 hours), starting a new one');
-        localStorage.removeItem('aiShoppingAssistant_conversation');
+        localStorage.removeItem(STORAGE_KEY);
         return false;
       }
 
@@ -792,7 +793,7 @@ class ChatWidget {
 
     console.log(`Displaying ${this.conversationHistory.length} messages from restored conversation ${this.conversationId}`);
 
-    // Clear existing messages
+    // Clear existing messages and loading indicators
     this.messagesContainer.innerHTML = '';
 
     // Add each message to the UI

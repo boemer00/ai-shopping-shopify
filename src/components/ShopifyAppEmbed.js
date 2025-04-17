@@ -6,6 +6,9 @@ import { initChatWidget } from './ChatWidget';
 // Track initialization status
 let isShopifyEmbedInitialized = false;
 
+// Same localStorage key as in ChatWidget.js to ensure consistency
+const STORAGE_KEY = 'aiShoppingAssistant_conversation';
+
 /**
  * Initialize the Shopify app embed
  * @returns {Object} The initialized chat widget
@@ -108,11 +111,7 @@ const ensureChatContainer = () => {
         <button id="toggle-chat" class="toggle-button">-</button>
       </div>
       <div class="chat-messages" id="chat-messages">
-        <div class="loading-indicator">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
+        <!-- Messages will appear here -->
       </div>
       <div class="chat-input-container">
         <input type="text" id="chat-input" placeholder="Ask about products...">
@@ -123,7 +122,7 @@ const ensureChatContainer = () => {
     document.body.appendChild(container);
 
     // Log conversation status for debugging
-    const storedData = localStorage.getItem('aiShoppingAssistant_conversation');
+    const storedData = localStorage.getItem(STORAGE_KEY);
     if (storedData) {
       try {
         const data = JSON.parse(storedData);
