@@ -72,11 +72,7 @@
       <button id="toggle-chat" class="toggle-button">-</button>
     </div>
     <div class="chat-messages" id="chat-messages">
-      <div class="loading-indicator">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
+      <!-- Messages will appear here -->
     </div>
     <div class="chat-input-container">
       <input type="text" id="chat-input" placeholder="Ask about products...">
@@ -112,17 +108,35 @@
         window.parent.postMessage({ type: 'AI_ASSISTANT_LOADED' }, '*');
       }
 
-      // Log localStorage state on page load for debugging
+      // Log localStorage and cookie state on page load for debugging
       try {
+        // Check localStorage
         const stored = localStorage.getItem('aiShoppingAssistant_conversation');
         if (stored) {
           const data = JSON.parse(stored);
           console.log('Found existing conversation in localStorage on page load:',
                      data.conversationId,
                      `with ${data.conversationHistory.length} messages`);
+        } else {
+          // Check cookie
+          const cookies = document.cookie.split(';');
+          let conversationId = null;
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.startsWith('ai_shop_conversation_id=')) {
+              conversationId = cookie.substring('ai_shop_conversation_id='.length);
+              break;
+            }
+          }
+
+          if (conversationId) {
+            console.log('Found existing conversation ID in cookie on page load:', conversationId);
+          } else {
+            console.log('No existing conversation found in localStorage or cookie on page load');
+          }
         }
       } catch (e) {
-        console.error('Error checking localStorage on page load:', e);
+        console.error('Error checking storage on page load:', e);
       }
     });
 
