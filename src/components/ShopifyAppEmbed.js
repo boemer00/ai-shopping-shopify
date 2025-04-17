@@ -3,6 +3,9 @@
  */
 import { initChatWidget } from './ChatWidget';
 
+// Track initialization status
+let isShopifyEmbedInitialized = false;
+
 /**
  * Initialize the Shopify app embed
  * @returns {Object} The initialized chat widget
@@ -10,7 +13,15 @@ import { initChatWidget } from './ChatWidget';
 export const initShopifyAppEmbed = () => {
   console.log('Initializing Shopify app embed');
 
+  // Prevent multiple initializations
+  if (isShopifyEmbedInitialized || window.aiShopAssistant) {
+    console.log('Shopify app embed already initialized, returning existing instance');
+    return window.aiShopAssistant;
+  }
+
   try {
+    isShopifyEmbedInitialized = true;
+
     // Check if we're in a Shopify storefront
     const isShopifyStorefront = isInShopifyStorefront();
     console.log('Is in Shopify storefront:', isShopifyStorefront);
@@ -31,6 +42,7 @@ export const initShopifyAppEmbed = () => {
     return chatWidget;
   } catch (error) {
     console.error('Error initializing Shopify app embed:', error);
+    isShopifyEmbedInitialized = false; // Reset flag if initialization failed
     return null;
   }
 };
@@ -88,6 +100,26 @@ const ensureChatContainer = () => {
     container = document.createElement('div');
     container.id = 'ai-shopping-assistant';
     container.className = 'chat-widget-container';
+
+    // Create full chat interface structure
+    container.innerHTML = `
+      <div class="chat-widget-header">
+        <h3>Shopping Assistant</h3>
+        <button id="toggle-chat" class="toggle-button">-</button>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="loading-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Ask about products...">
+        <button id="send-message">Send</button>
+      </div>
+    `;
+
     document.body.appendChild(container);
   }
 
@@ -96,7 +128,9 @@ const ensureChatContainer = () => {
 
 /**
  * Load the app when DOM is ready
+ * This self-executing code can be removed as the main index.js now handles initialization
  */
+/*
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   console.log('Document already ready, initializing Shopify app embed');
   setTimeout(() => initShopifyAppEmbed(), 100);
@@ -106,5 +140,6 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
     setTimeout(() => initShopifyAppEmbed(), 100);
   });
 }
+*/
 
 export default initShopifyAppEmbed;

@@ -108,11 +108,38 @@ class ChatWidget {
         console.log('Container created and appended to body');
       }
 
-      // Get references to elements within the container
-      this.messagesContainer = document.getElementById('chat-messages');
-      this.inputField = document.getElementById('chat-input');
-      this.sendButton = document.getElementById('send-message');
-      this.toggleButton = document.getElementById('toggle-chat');
+      // When using a pre-existing container, check if it already has the chat interface
+      const hasRequiredElements =
+        this.container.querySelector('.chat-messages') &&
+        this.container.querySelector('input[type="text"]') &&
+        this.container.querySelector('button:not(.toggle-button)') &&
+        this.container.querySelector('.toggle-button');
+
+      // If container exists but doesn't have the required elements, add them
+      if (!hasRequiredElements) {
+        console.log('Container exists but missing required elements, adding chat interface');
+        // Save any existing content that might be a loading indicator
+        const existingContent = this.container.innerHTML;
+        this.container.innerHTML = `
+          <div class="chat-widget-header">
+            <h3>Shopping Assistant</h3>
+            <button id="toggle-chat" class="toggle-button">-</button>
+          </div>
+          <div class="chat-messages" id="chat-messages">
+            ${existingContent}
+          </div>
+          <div class="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Ask about products...">
+            <button id="send-message">Send</button>
+          </div>
+        `;
+      }
+
+      // Get references to elements within the container directly
+      this.messagesContainer = this.container.querySelector('.chat-messages');
+      this.inputField = this.container.querySelector('input[type="text"]');
+      this.sendButton = this.container.querySelector('button:not(.toggle-button)');
+      this.toggleButton = this.container.querySelector('.toggle-button');
 
       console.log('Elements found:',
         'messagesContainer:', !!this.messagesContainer,
@@ -121,53 +148,44 @@ class ChatWidget {
         'toggleButton:', !!this.toggleButton
       );
 
-      // If elements still not found, try to find them within the container directly
-      if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
-        console.log('Some elements not found by ID, trying to find within container');
-
-        if (!this.messagesContainer) {
-          this.messagesContainer = this.container.querySelector('.chat-messages');
-        }
-
-        if (!this.inputField) {
-          this.inputField = this.container.querySelector('input[type="text"]');
-        }
-
-        if (!this.sendButton) {
-          this.sendButton = this.container.querySelector('button:not(.toggle-button)');
-        }
-
-        if (!this.toggleButton) {
-          this.toggleButton = this.container.querySelector('.toggle-button');
-        }
-
-        console.log('Elements after container search:',
-          'messagesContainer:', !!this.messagesContainer,
-          'inputField:', !!this.inputField,
-          'sendButton:', !!this.sendButton,
-          'toggleButton:', !!this.toggleButton
-        );
-      }
-
       // If we still couldn't find all elements, log an error and return
       if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
         console.error('ChatWidget initialization failed - critical elements not found');
         return;
       }
 
-      // Create a new conversation in Supabase
-      await this.createNewConversation();
+      // Clear any existing messages from the container (to prevent duplicates)
+      // Only keep loading indicators
+      const existingMessages = this.messagesContainer.querySelectorAll('.message:not(.loading)');
+      if (existingMessages.length > 0) {
+        console.log(`Found ${existingMessages.length} existing messages, clearing them to prevent duplicates`);
+        existingMessages.forEach(msg => msg.remove());
+      }
+
+      // Try to restore conversation from storage first
+      const restored = this.restoreConversationFromStorage();
+
+      if (!restored) {
+        // If we couldn't restore, create a new conversation in Supabase
+        await this.createNewConversation();
+
+        // Load previous messages if available
+        await this.loadMessages();
+
+        // Add welcome message if no previous messages and no existing welcome message
+        const hasExistingMessages = this.conversationHistory.length > 0;
+        const hasWelcomeMessageInDOM = this.messagesContainer.querySelector('.assistant-message') !== null;
+
+        if (!hasExistingMessages && !hasWelcomeMessageInDOM && this.messagesContainer) {
+          console.log('No messages found, adding welcome message');
+          this.addWelcomeMessageDirect();
+        } else {
+          console.log('Skipping welcome message, conversation already has messages');
+        }
+      }
 
       // Set up event listeners
       this.setupEventListeners();
-
-      // Load previous messages if available
-      await this.loadMessages();
-
-      // Add welcome message if no previous messages
-      if (this.conversationHistory.length === 0 && this.messagesContainer) {
-        this.addWelcomeMessageDirect();
-      }
 
       this.initialized = true;
       console.log('ChatWidget initialization completed');
@@ -343,6 +361,13 @@ class ChatWidget {
       return;
     }
 
+    // Check if welcome message already exists to prevent duplicates
+    const existingWelcomeMessages = this.messagesContainer.querySelectorAll('.assistant-message');
+    if (existingWelcomeMessages.length > 0) {
+      console.log('Welcome message already exists, skipping to prevent duplicates');
+      return;
+    }
+
     // Create the date string manually
     const now = new Date();
     const day = now.getDate().toString().padStart(2, '0');
@@ -374,6 +399,9 @@ class ChatWidget {
 
     // Save welcome message to Supabase
     this.saveMessageToSupabase('assistant', "Hello! I'm your shopping assistant. How can I help you today?");
+
+    // Save conversation to localStorage to persist across page navigation
+    this.saveConversationToStorage();
   }
 
   /**
@@ -428,6 +456,9 @@ class ChatWidget {
 
     // Save user message to Supabase
     await this.saveMessageToSupabase('user', message);
+
+    // Save conversation to localStorage to persist across page navigation
+    this.saveConversationToStorage();
 
     // Show loading indicator
     this.setLoading(true);
@@ -495,6 +526,9 @@ class ChatWidget {
       // Directly add assistant message
       this.addAssistantMessageDirect(assistantResponse);
 
+      // Save updated conversation to localStorage
+      this.saveConversationToStorage();
+
     } catch (error) {
       console.error('Error processing message:', error);
 
@@ -503,6 +537,9 @@ class ChatWidget {
 
       // Save error message to Supabase
       await this.saveMessageToSupabase('assistant', 'Sorry, I encountered an error. Please try again later. Technical details: ' + error.message);
+
+      // Save conversation with error message to localStorage
+      this.saveConversationToStorage();
     } finally {
       this.setLoading(false);
     }
@@ -511,8 +548,9 @@ class ChatWidget {
   /**
    * Add a user message directly to the chat
    * @param {string} message - User message
+   * @param {boolean} shouldScroll - Whether to scroll to bottom after adding message
    */
-  addUserMessageDirect(message) {
+  addUserMessageDirect(message, shouldScroll = true) {
     console.log('Adding user message directly:', message);
 
     // Create the date string manually
@@ -539,14 +577,17 @@ class ChatWidget {
     `;
 
     this.messagesContainer.appendChild(messageElement);
-    this.scrollToBottom();
+    if (shouldScroll) {
+      this.scrollToBottom();
+    }
   }
 
   /**
    * Add an assistant message directly to the chat
    * @param {string} message - Assistant message
+   * @param {boolean} shouldScroll - Whether to scroll to bottom after adding message
    */
-  addAssistantMessageDirect(message) {
+  addAssistantMessageDirect(message, shouldScroll = true) {
     console.log('Adding assistant message directly:', message);
 
     // Create the date string manually
@@ -573,7 +614,9 @@ class ChatWidget {
     `;
 
     this.messagesContainer.appendChild(messageElement);
-    this.scrollToBottom();
+    if (shouldScroll) {
+      this.scrollToBottom();
+    }
   }
 
   /**
@@ -654,5 +697,98 @@ class ChatWidget {
       this.container.classList.remove('minimized');
       this.toggleButton.textContent = '-';
     }
+  }
+
+  /**
+   * Save conversation state to localStorage
+   * This allows us to maintain conversation across page navigation
+   */
+  saveConversationToStorage() {
+    try {
+      // Don't save if no conversation ID
+      if (!this.conversationId) {
+        return;
+      }
+
+      const conversationData = {
+        conversationId: this.conversationId,
+        shopId: this.shopId,
+        customerId: this.customerId,
+        conversationHistory: this.conversationHistory,
+        timestamp: new Date().getTime()
+      };
+
+      localStorage.setItem('aiShoppingAssistant_conversation', JSON.stringify(conversationData));
+      console.log('Conversation saved to localStorage');
+    } catch (error) {
+      console.error('Error saving conversation to localStorage:', error);
+    }
+  }
+
+  /**
+   * Restore conversation from localStorage
+   * @returns {boolean} Whether restoration was successful
+   */
+  restoreConversationFromStorage() {
+    try {
+      const storedData = localStorage.getItem('aiShoppingAssistant_conversation');
+      if (!storedData) {
+        console.log('No stored conversation found');
+        return false;
+      }
+
+      const conversationData = JSON.parse(storedData);
+
+      // Check if data is still valid (not older than 24 hours)
+      const now = new Date().getTime();
+      const storedTime = conversationData.timestamp || 0;
+      const hoursSinceStored = (now - storedTime) / (1000 * 60 * 60);
+
+      if (hoursSinceStored > 24) {
+        console.log('Stored conversation is too old (>24 hours), starting a new one');
+        localStorage.removeItem('aiShoppingAssistant_conversation');
+        return false;
+      }
+
+      // Restore conversation data
+      this.conversationId = conversationData.conversationId;
+      this.conversationHistory = conversationData.conversationHistory || [];
+
+      // Display messages from history in the UI
+      this.displayConversationHistory();
+
+      console.log('Conversation restored from localStorage:',
+        this.conversationId,
+        `(${this.conversationHistory.length} messages)`
+      );
+      return true;
+    } catch (error) {
+      console.error('Error restoring conversation from localStorage:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Display conversation history in the chat UI
+   */
+  displayConversationHistory() {
+    if (!this.messagesContainer || !this.conversationHistory || this.conversationHistory.length === 0) {
+      return;
+    }
+
+    // Clear existing messages
+    this.messagesContainer.innerHTML = '';
+
+    // Add each message to the UI
+    this.conversationHistory.forEach(message => {
+      if (message.role === 'user') {
+        this.addUserMessageDirect(message.content, false); // Don't scroll on each message
+      } else if (message.role === 'assistant') {
+        this.addAssistantMessageDirect(message.content, false); // Don't scroll on each message
+      }
+    });
+
+    // Scroll to bottom after adding all messages
+    setTimeout(() => this.scrollToBottom(), 100);
   }
 }
