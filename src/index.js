@@ -55,18 +55,18 @@ const init = () => {
       }
     } else {
       // Initialize standalone chat widget if container exists
-      const chatContainer = document.getElementById('ai-shopping-assistant');
-      if (chatContainer) {
+    const chatContainer = document.getElementById('ai-shopping-assistant');
+    if (chatContainer) {
         console.log('Initializing chat widget in standalone mode');
-        try {
-          const chatWidget = initChatWidget();
-          window.aiShopAssistant = chatWidget;
-          console.log('Chat widget initialized and exposed as window.aiShopAssistant');
-        } catch (e) {
-          console.error('Failed to initialize chat widget:', e);
-        }
-      } else {
-        console.log('Chat widget container not found in the DOM');
+      try {
+        const chatWidget = initChatWidget();
+        window.aiShopAssistant = chatWidget;
+        console.log('Chat widget initialized and exposed as window.aiShopAssistant');
+      } catch (e) {
+        console.error('Failed to initialize chat widget:', e);
+      }
+    } else {
+      console.log('Chat widget container not found in the DOM');
       }
     }
 
