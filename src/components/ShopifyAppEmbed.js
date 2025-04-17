@@ -88,6 +88,26 @@ const ensureChatContainer = () => {
     container = document.createElement('div');
     container.id = 'ai-shopping-assistant';
     container.className = 'chat-widget-container';
+
+    // Create full chat interface structure
+    container.innerHTML = `
+      <div class="chat-widget-header">
+        <h3>Shopping Assistant</h3>
+        <button id="toggle-chat" class="toggle-button">-</button>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="loading-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Ask about products...">
+        <button id="send-message">Send</button>
+      </div>
+    `;
+
     document.body.appendChild(container);
   }
 

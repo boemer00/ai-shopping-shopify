@@ -108,11 +108,38 @@ class ChatWidget {
         console.log('Container created and appended to body');
       }
 
-      // Get references to elements within the container
-      this.messagesContainer = document.getElementById('chat-messages');
-      this.inputField = document.getElementById('chat-input');
-      this.sendButton = document.getElementById('send-message');
-      this.toggleButton = document.getElementById('toggle-chat');
+      // When using a pre-existing container, check if it already has the chat interface
+      const hasRequiredElements =
+        this.container.querySelector('.chat-messages') &&
+        this.container.querySelector('input[type="text"]') &&
+        this.container.querySelector('button:not(.toggle-button)') &&
+        this.container.querySelector('.toggle-button');
+
+      // If container exists but doesn't have the required elements, add them
+      if (!hasRequiredElements) {
+        console.log('Container exists but missing required elements, adding chat interface');
+        // Save any existing content that might be a loading indicator
+        const existingContent = this.container.innerHTML;
+        this.container.innerHTML = `
+          <div class="chat-widget-header">
+            <h3>Shopping Assistant</h3>
+            <button id="toggle-chat" class="toggle-button">-</button>
+          </div>
+          <div class="chat-messages" id="chat-messages">
+            ${existingContent}
+          </div>
+          <div class="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Ask about products...">
+            <button id="send-message">Send</button>
+          </div>
+        `;
+      }
+
+      // Get references to elements within the container directly
+      this.messagesContainer = this.container.querySelector('.chat-messages');
+      this.inputField = this.container.querySelector('input[type="text"]');
+      this.sendButton = this.container.querySelector('button:not(.toggle-button)');
+      this.toggleButton = this.container.querySelector('.toggle-button');
 
       console.log('Elements found:',
         'messagesContainer:', !!this.messagesContainer,
@@ -120,34 +147,6 @@ class ChatWidget {
         'sendButton:', !!this.sendButton,
         'toggleButton:', !!this.toggleButton
       );
-
-      // If elements still not found, try to find them within the container directly
-      if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
-        console.log('Some elements not found by ID, trying to find within container');
-
-        if (!this.messagesContainer) {
-          this.messagesContainer = this.container.querySelector('.chat-messages');
-        }
-
-        if (!this.inputField) {
-          this.inputField = this.container.querySelector('input[type="text"]');
-        }
-
-        if (!this.sendButton) {
-          this.sendButton = this.container.querySelector('button:not(.toggle-button)');
-        }
-
-        if (!this.toggleButton) {
-          this.toggleButton = this.container.querySelector('.toggle-button');
-        }
-
-        console.log('Elements after container search:',
-          'messagesContainer:', !!this.messagesContainer,
-          'inputField:', !!this.inputField,
-          'sendButton:', !!this.sendButton,
-          'toggleButton:', !!this.toggleButton
-        );
-      }
 
       // If we still couldn't find all elements, log an error and return
       if (!this.messagesContainer || !this.inputField || !this.sendButton || !this.toggleButton) {
