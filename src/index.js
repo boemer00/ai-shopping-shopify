@@ -13,9 +13,19 @@ import { initShopifyAppEmbed } from './components/ShopifyAppEmbed';
 // For debugging
 console.log('index.js loaded');
 
+// Global initialization flag to prevent multiple initializations
+let isInitialized = false;
+
 // Initialize the application
 const init = () => {
+  // Prevent multiple initializations
+  if (isInitialized || window.aiShopAssistant) {
+    console.log('Application already initialized, skipping');
+    return;
+  }
+
   console.log('AI Shopping application initialization started');
+  isInitialized = true;
 
   try {
     // Check if we're running in Shopify admin via App Bridge
@@ -55,18 +65,18 @@ const init = () => {
       }
     } else {
       // Initialize standalone chat widget if container exists
-    const chatContainer = document.getElementById('ai-shopping-assistant');
-    if (chatContainer) {
+      const chatContainer = document.getElementById('ai-shopping-assistant');
+      if (chatContainer) {
         console.log('Initializing chat widget in standalone mode');
-      try {
-        const chatWidget = initChatWidget();
-        window.aiShopAssistant = chatWidget;
-        console.log('Chat widget initialized and exposed as window.aiShopAssistant');
-      } catch (e) {
-        console.error('Failed to initialize chat widget:', e);
-      }
-    } else {
-      console.log('Chat widget container not found in the DOM');
+        try {
+          const chatWidget = initChatWidget();
+          window.aiShopAssistant = chatWidget;
+          console.log('Chat widget initialized and exposed as window.aiShopAssistant');
+        } catch (e) {
+          console.error('Failed to initialize chat widget:', e);
+        }
+      } else {
+        console.log('Chat widget container not found in the DOM');
       }
     }
 
@@ -75,6 +85,7 @@ const init = () => {
     console.log('AI Shopping application initialization completed');
   } catch (error) {
     console.error('Error during application initialization:', error);
+    isInitialized = false; // Reset flag if initialization failed
   }
 };
 
@@ -93,8 +104,8 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   // Also listen for load event as a fallback
   window.addEventListener('load', () => {
     console.log('Window load event fired, checking if initialization has occurred');
-    // Only initialize if aiShopAssistant is not yet defined
-    if (!window.aiShopAssistant) {
+    // Only initialize if aiShopAssistant is not yet defined and not already initialized
+    if (!window.aiShopAssistant && !isInitialized) {
       console.log('Application not yet initialized, running init');
       setTimeout(init, 100);
     }

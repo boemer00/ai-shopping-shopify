@@ -154,6 +154,14 @@ class ChatWidget {
         return;
       }
 
+      // Clear any existing messages from the container (to prevent duplicates)
+      // Only keep loading indicators
+      const existingMessages = this.messagesContainer.querySelectorAll('.message:not(.loading)');
+      if (existingMessages.length > 0) {
+        console.log(`Found ${existingMessages.length} existing messages, clearing them to prevent duplicates`);
+        existingMessages.forEach(msg => msg.remove());
+      }
+
       // Create a new conversation in Supabase
       await this.createNewConversation();
 
@@ -163,9 +171,15 @@ class ChatWidget {
       // Load previous messages if available
       await this.loadMessages();
 
-      // Add welcome message if no previous messages
-      if (this.conversationHistory.length === 0 && this.messagesContainer) {
+      // Add welcome message if no previous messages and no existing welcome message
+      const hasExistingMessages = this.conversationHistory.length > 0;
+      const hasWelcomeMessageInDOM = this.messagesContainer.querySelector('.assistant-message') !== null;
+
+      if (!hasExistingMessages && !hasWelcomeMessageInDOM && this.messagesContainer) {
+        console.log('No messages found, adding welcome message');
         this.addWelcomeMessageDirect();
+      } else {
+        console.log('Skipping welcome message, conversation already has messages');
       }
 
       this.initialized = true;
@@ -339,6 +353,13 @@ class ChatWidget {
 
     if (!this.messagesContainer) {
       console.error('messagesContainer is null - cannot add welcome message');
+      return;
+    }
+
+    // Check if welcome message already exists to prevent duplicates
+    const existingWelcomeMessages = this.messagesContainer.querySelectorAll('.assistant-message');
+    if (existingWelcomeMessages.length > 0) {
+      console.log('Welcome message already exists, skipping to prevent duplicates');
       return;
     }
 
